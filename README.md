@@ -7,13 +7,25 @@ A one-page app: type a Pokémon's name (or Dex number) and it shows
 - its status moves, each with a one-line summary of what it does,
 - the type of every move, plus power, accuracy and PP.
 
-## Running it
+## Using it
 
-Open `index.html` in a browser. That's it — no install, no build step, no
-server. It needs an internet connection because the data comes live from
-[PokéAPI](https://pokeapi.co).
+It is live at **https://zeuskodiak.github.io/pokemon-move-types/** — open that on
+a phone and "Add to Home Screen" for an app-like icon.
 
-You can deep-link a Pokémon by adding it to the URL: `index.html#gengar`.
+To run the local copy instead, open `index.html` in a browser. No install, no
+build step, no server. Either way it needs an internet connection, because the
+data comes live from [PokéAPI](https://pokeapi.co).
+
+You can deep-link a Pokémon by adding it to the URL, e.g.
+`https://zeuskodiak.github.io/pokemon-move-types/#gengar`.
+
+## Publishing changes
+
+The live site is served by GitHub Pages from the separate public repo
+[`ZeusKodiak/pokemon-move-types`](https://github.com/ZeusKodiak/pokemon-move-types),
+because Pages on a private repo needs a paid plan. This folder is the working
+copy; to publish an edit, copy `index.html` across to that repo's root and push
+to its `main`. Pages rebuilds on its own within a minute or two.
 
 ## How the move lists are picked
 
