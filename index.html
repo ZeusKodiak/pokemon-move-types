@@ -95,17 +95,55 @@
   td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .damage { color: var(--muted); font-size: 0.85rem; text-transform: capitalize; }
   .scroll { overflow-x: auto; }
+
+  #pickerBox { margin-bottom: 1.5rem; }
+  #pickerCount { margin: 0 0 0.4rem; font-size: 0.85rem; }
+  .picker {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 15rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+  }
+  .picker li { border-bottom: 1px solid var(--line); }
+  .picker li:last-child { border-bottom: 0; }
+  .picker button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    color: var(--text);
+    font-weight: 400;
+    text-transform: capitalize;
+    /* Comfortable tap target on a phone. */
+    padding: 0.7rem 0.8rem;
+  }
+  .picker button:hover, .picker button:focus { background: var(--line); }
+  .picker .dexnum { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .region { color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
   <h1>Pokémon Move Types</h1>
-  <p class="tagline">Type a Pokémon's name or National Dex number to see its types and its strongest moves — and what type each move is.</p>
+  <p class="tagline">Pick a Pokémon from the list to see its region, its types, and its main moves — and what type each move is. Type in the box to narrow the list down.</p>
 
   <form id="search">
-    <input id="query" name="query" placeholder="e.g. gengar, or 94" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    <input id="query" name="query" placeholder="Start typing, or scroll the list" autocomplete="off" autocapitalize="off" spellcheck="false">
     <button type="submit">Look up</button>
   </form>
+
+  <div id="pickerBox">
+    <p id="pickerCount" class="status"></p>
+    <ul id="picker" class="picker"></ul>
+  </div>
 
   <p id="status" class="status"></p>
   <div id="result"></div>
@@ -123,19 +161,101 @@ const TYPE_COLOURS = {
   steel: "#5f8f9f", fairy: "#e397d1",
 };
 
+// PokéAPI groups Pokémon by generation, not by region, so map across. Each
+// generation was introduced in exactly one region.
+const REGIONS = {
+  "generation-i": "Kanto", "generation-ii": "Johto", "generation-iii": "Hoenn",
+  "generation-iv": "Sinnoh", "generation-v": "Unova", "generation-vi": "Kalos",
+  "generation-vii": "Alola", "generation-viii": "Galar", "generation-ix": "Paldea",
+};
+
+// Long lists are slow to render on a phone, so cap what is shown at once.
+const MAX_LISTED = 200;
+
 const form = document.getElementById("search");
 const queryInput = document.getElementById("query");
 const submitButton = form.querySelector("button");
 const statusEl = document.getElementById("status");
 const resultEl = document.getElementById("result");
+const pickerEl = document.getElementById("picker");
+const pickerCountEl = document.getElementById("pickerCount");
 
 // Move details are fetched one request per move, so cache them across lookups.
 const moveCache = new Map();
 
+// Every Pokémon name, fetched once so filtering happens locally with no lag.
+let allPokemon = [];
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  lookup(queryInput.value);
+  if (!queryInput.value.trim()) return;
+  // Enter on a narrowed list should pick the top match, so a near-miss
+  // spelling still works without having to get it exactly right.
+  const matches = filterPokemon(queryInput.value);
+  lookup(matches.length ? matches[0].name : queryInput.value);
 });
+
+queryInput.addEventListener("input", () => renderPicker(queryInput.value));
+
+pickerEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-name]");
+  if (!button) return;
+  queryInput.value = button.dataset.name;
+  lookup(button.dataset.name);
+});
+
+async function loadPokemonList() {
+  const data = await fetchJSON(`${API}/pokemon?limit=100000`);
+  allPokemon = data.results.map((entry) => ({
+    name: entry.name,
+    // The dex number is the last path segment of the entry's URL.
+    id: Number(entry.url.replace(/\/$/, "").split("/").pop()),
+  }));
+  renderPicker(queryInput.value);
+}
+
+function filterPokemon(rawQuery) {
+  const needle = rawQuery.trim().toLowerCase().replace(/[\s-]/g, "");
+  if (!needle) return allPokemon;
+  const matches = allPokemon.filter(
+    (p) => p.name.replace(/-/g, "").includes(needle) || String(p.id) === needle
+  );
+  // Names that start with what was typed are the likelier intent, so float
+  // them up: typing "char" should offer Charmander before Wartortle.
+  return matches.sort((a, b) => {
+    const aStarts = a.name.startsWith(needle);
+    const bStarts = b.name.startsWith(needle);
+    return aStarts === bStarts ? a.id - b.id : aStarts ? -1 : 1;
+  });
+}
+
+function renderPicker(rawQuery) {
+  if (!allPokemon.length) {
+    pickerCountEl.textContent = "Loading the Pokémon list…";
+    return;
+  }
+
+  const matches = filterPokemon(rawQuery);
+  const shown = matches.slice(0, MAX_LISTED);
+
+  pickerEl.innerHTML = shown
+    .map(
+      (p) => `<li><button type="button" data-name="${escapeHTML(p.name)}">
+        ${escapeHTML(p.name.replace(/-/g, " "))}
+        <span class="dexnum">#${String(p.id).padStart(4, "0")}</span>
+      </button></li>`
+    )
+    .join("");
+
+  if (!matches.length) {
+    pickerCountEl.textContent = `Nothing matches "${rawQuery.trim()}".`;
+  } else if (matches.length > shown.length) {
+    pickerCountEl.textContent =
+      `Showing ${shown.length} of ${matches.length} — keep typing to narrow it down.`;
+  } else {
+    pickerCountEl.textContent = `${matches.length} match${matches.length === 1 ? "" : "es"}.`;
+  }
+}
 
 async function lookup(rawQuery) {
   const name = rawQuery.trim().toLowerCase().replace(/\s+/g, "-");
@@ -148,8 +268,11 @@ async function lookup(rawQuery) {
   try {
     const pokemon = await fetchJSON(`${API}/pokemon/${encodeURIComponent(name)}`);
     setStatus("Loading moves…");
-    const moves = await loadMainMoves(pokemon);
-    render(pokemon, moves);
+    const [moves, region] = await Promise.all([
+      loadMainMoves(pokemon),
+      loadRegion(pokemon),
+    ]);
+    render(pokemon, moves, region);
     setStatus("");
     location.hash = pokemon.name;
   } catch (error) {
@@ -159,6 +282,17 @@ async function lookup(rawQuery) {
     setStatus(message, true);
   } finally {
     submitButton.disabled = false;
+  }
+}
+
+// The region is on the species, not the Pokémon, so this is a second request.
+// A failure here should not lose the moves, so fall back to an empty label.
+async function loadRegion(pokemon) {
+  try {
+    const species = await fetchJSON(pokemon.species.url);
+    return REGIONS[species.generation.name] || "";
+  } catch {
+    return "";
   }
 }
 
@@ -226,7 +360,7 @@ function shortEffect(move) {
   return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
 }
 
-function render(pokemon, moves) {
+function render(pokemon, moves, region) {
   const sprite =
     pokemon.sprites.other?.["official-artwork"]?.front_default ||
     pokemon.sprites.front_default;
@@ -238,7 +372,10 @@ function render(pokemon, moves) {
       ${sprite ? `<img src="${sprite}" alt="${pokemon.name}">` : ""}
       <div>
         <h2>${pokemon.name.replace(/-/g, " ")}</h2>
-        <div class="dex">#${String(pokemon.id).padStart(4, "0")}</div>
+        <div class="dex">
+          #${String(pokemon.id).padStart(4, "0")}
+          ${region ? `<span class="region">· ${escapeHTML(region)} region</span>` : ""}
+        </div>
         <div class="types">${pokemon.types.map((t) => typePill(t.type.name)).join("")}</div>
       </div>
     </div>
@@ -296,8 +433,13 @@ function setStatus(message, isError = false) {
 
 // Allow deep links like index.html#gengar, and a default so the page isn't blank.
 const initial = decodeURIComponent(location.hash.slice(1)) || "pikachu";
-queryInput.value = initial;
 lookup(initial);
+
+// The list is a separate request, so let it load alongside the first lookup
+// rather than holding the page up. The box starts empty so the full list shows.
+loadPokemonList().catch(() => {
+  pickerCountEl.textContent = "Couldn't load the Pokémon list — typing a name still works.";
+});
 </script>
 </body>
 </html>

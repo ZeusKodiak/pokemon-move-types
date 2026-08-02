@@ -1,7 +1,9 @@
 # Pokémon Move Types
 
-A one-page app: type a Pokémon's name (or Dex number) and it shows
+A one-page app: pick a Pokémon from the filterable list — or type a name or Dex
+number — and it shows
 
+- the region it comes from,
 - the Pokémon's own type(s),
 - its attacking moves — the highest-power moves it can learn,
 - its status moves, each with a one-line summary of what it does,
@@ -40,9 +42,29 @@ result in two:
   they have no power to rank by. Each shows PokéAPI's one-line effect summary,
   because "Swords Dance" on its own tells you nothing.
 
+## Picking a Pokémon
+
+The list under the search box holds every Pokémon PokéAPI knows about, so
+nothing has to be spelled from memory — scroll it, or type a few letters to
+narrow it. Matching ignores case, spaces and hyphens, so `mrmime` finds
+`mr-mime`, and a Dex number works too. Names starting with what you typed sort
+first, so `char` offers Charmander before Wartortle. Pressing Enter picks the
+top match.
+
+The list is capped at 200 rows on screen at a time to keep scrolling smooth on
+a phone; the count above it says when there are more.
+
+## Regions
+
+PokéAPI records a *generation*, not a region, so the app maps one to the other —
+generation I is Kanto, II is Johto, and so on through to IX being Paldea. That
+is the region a species was introduced in, which is not always where you can
+catch it in a given game.
+
 ## Notes
 
 - Alternate forms need their full name, e.g. `deoxys-normal`, `giratina-origin`.
+  The list shows these in full, so picking from it avoids the problem.
 - Move details are one HTTP request each, so the first lookup for a Pokémon
   takes a moment. Results are cached for the rest of the session.
 
