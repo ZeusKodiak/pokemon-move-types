@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pokémon Move Types</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1b1c1f;
+    --muted: #6b6f76;
+    --line: #e2e4e8;
+    --accent: #d94b4b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --card: #1f2228;
+      --text: #eceef1;
+      --muted: #9aa0a8;
+      --line: #2e323a;
+      --accent: #e56b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 1.5rem 1rem 4rem;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .tagline { color: var(--muted); margin: 0 0 1.5rem; }
+
+  form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  input, button {
+    font: inherit;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+  }
+  input { flex: 1; min-width: 0; background: var(--card); color: var(--text); }
+  button {
+    background: var(--accent);
+    border-color: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .status { color: var(--muted); }
+  .status.error { color: var(--accent); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+  .head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .head img { width: 96px; height: 96px; image-rendering: pixelated; }
+  .head h2 { margin: 0; font-size: 1.35rem; text-transform: capitalize; }
+  .dex { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .types { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .type {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+    white-space: nowrap;
+  }
+
+  h3 { margin: 1.75rem 0 0.5rem; font-size: 1rem; }
+  h3 .note { font-weight: 400; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.4rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  th { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  td.name { text-transform: capitalize; min-width: 11rem; }
+  td.name .damage { text-transform: none; max-width: 26rem; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .damage { color: var(--muted); font-size: 0.85rem; text-transform: capitalize; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pokémon Move Types</h1>
+  <p class="tagline">Type a Pokémon's name or National Dex number to see its types and its strongest moves — and what type each move is.</p>
+
+  <form id="search">
+    <input id="query" name="query" placeholder="e.g. gengar, or 94" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    <button type="submit">Look up</button>
+  </form>
+
+  <p id="status" class="status"></p>
+  <div id="result"></div>
+</main>
+
+<script>
+const API = "https://pokeapi.co/api/v2";
+
+// Official type colours, used for the type pills.
+const TYPE_COLOURS = {
+  normal: "#9fa19f", fire: "#e8722c", water: "#3692dc", electric: "#e5c531",
+  grass: "#4fa64f", ice: "#4fbdbd", fighting: "#c03028", poison: "#9141cb",
+  ground: "#d97845", flying: "#8fa8dd", psychic: "#e56399", bug: "#8cb230",
+  rock: "#b8a038", ghost: "#6f4570", dragon: "#5361ad", dark: "#5b5366",
+  steel: "#5f8f9f", fairy: "#e397d1",
+};
+
+const form = document.getElementById("search");
+const queryInput = document.getElementById("query");
+const submitButton = form.querySelector("button");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
+
+// Move details are fetched one request per move, so cache them across lookups.
+const moveCache = new Map();
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  lookup(queryInput.value);
+});
+
+async function lookup(rawQuery) {
+  const name = rawQuery.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!name) return;
+
+  submitButton.disabled = true;
+  resultEl.innerHTML = "";
+  setStatus("Looking up " + name + "…");
+
+  try {
+    const pokemon = await fetchJSON(`${API}/pokemon/${encodeURIComponent(name)}`);
+    setStatus("Loading moves…");
+    const moves = await loadMainMoves(pokemon);
+    render(pokemon, moves);
+    setStatus("");
+    location.hash = pokemon.name;
+  } catch (error) {
+    const message = error.status === 404
+      ? `No Pokémon called "${name}". Check the spelling — forms need a suffix, like "deoxys-normal".`
+      : `Couldn't load that: ${error.message}`;
+    setStatus(message, true);
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+async function fetchJSON(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const error = new Error(`request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
+// "Main moves" = the strongest-hitting moves it can learn, since the API has no
+// notion of a signature or competitive moveset. Level-up moves first, because a
+// species' level-up list is the closest thing to a characteristic moveset;
+// TM/tutor/egg moves fill the rest of the table.
+async function loadMainMoves(pokemon) {
+  const levelUp = [];
+  const other = [];
+  for (const entry of pokemon.moves) {
+    const learnedByLevel = entry.version_group_details.some(
+      (detail) => detail.move_learn_method.name === "level-up"
+    );
+    (learnedByLevel ? levelUp : other).push(entry.move);
+  }
+
+  const candidates = [...levelUp, ...other].slice(0, 60);
+  const details = await Promise.all(candidates.map(loadMove));
+
+  return {
+    // Damaging moves rank by base power.
+    damaging: details
+      .filter((move) => move.power !== null)
+      .sort((a, b) => b.power - a.power || a.name.localeCompare(b.name))
+      .slice(0, 12),
+    // Status moves have no power to rank by, so they keep candidate order —
+    // level-up moves first, which is the most characteristic of the species.
+    status: details
+      .filter((move) => move.damageClass === "status")
+      .slice(0, 10),
+  };
+}
+
+async function loadMove(ref) {
+  if (!moveCache.has(ref.name)) {
+    moveCache.set(ref.name, fetchJSON(ref.url).then((move) => ({
+      name: move.name,
+      power: move.power,
+      accuracy: move.accuracy,
+      pp: move.pp,
+      type: move.type.name,
+      damageClass: move.damage_class.name,
+      effect: shortEffect(move),
+    })));
+  }
+  return moveCache.get(ref.name);
+}
+
+// Status moves are unreadable without knowing what they do, so pull the
+// one-line effect summary and fill in the move's own effect chance.
+function shortEffect(move) {
+  const entry = move.effect_entries.find((e) => e.language.name === "en");
+  if (!entry) return "";
+  return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
+}
+
+function render(pokemon, moves) {
+  const sprite =
+    pokemon.sprites.other?.["official-artwork"]?.front_default ||
+    pokemon.sprites.front_default;
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="head">
+      ${sprite ? `<img src="${sprite}" alt="${pokemon.name}">` : ""}
+      <div>
+        <h2>${pokemon.name.replace(/-/g, " ")}</h2>
+        <div class="dex">#${String(pokemon.id).padStart(4, "0")}</div>
+        <div class="types">${pokemon.types.map((t) => typePill(t.type.name)).join("")}</div>
+      </div>
+    </div>
+
+    <h3>Attacking moves <span class="note">— highest-power moves it can learn</span></h3>
+    ${moves.damaging.length
+      ? moveTable(moves.damaging)
+      : "<p class='status'>No damaging moves found for this Pokémon.</p>"}
+
+    <h3>Status moves <span class="note">— non-damaging moves it can learn</span></h3>
+    ${moves.status.length
+      ? moveTable(moves.status)
+      : "<p class='status'>No status moves found for this Pokémon.</p>"}
+  `;
+  resultEl.appendChild(card);
+}
+
+function moveTable(moves) {
+  const rows = moves.map((move) => `
+    <tr>
+      <td class="name">
+        ${escapeHTML(move.name.replace(/-/g, " "))}
+        <div class="damage">${escapeHTML(
+          move.damageClass === "status" && move.effect ? move.effect : move.damageClass
+        )}</div>
+      </td>
+      <td>${typePill(move.type)}</td>
+      <td class="num">${move.power === null ? "—" : move.power}</td>
+      <td class="num">${move.accuracy === null ? "—" : move.accuracy + "%"}</td>
+      <td class="num">${move.pp}</td>
+    </tr>
+  `).join("");
+
+  return `<div class="scroll"><table>
+    <thead><tr><th>Move</th><th>Type</th><th>Power</th><th>Acc.</th><th>PP</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function typePill(name) {
+  const colour = TYPE_COLOURS[name] || "#777";
+  return `<span class="type" style="background:${colour}">${escapeHTML(name)}</span>`;
+}
+
+function escapeHTML(text) {
+  return String(text).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[char]));
+}
+
+function setStatus(message, isError = false) {
+  statusEl.textContent = message;
+  statusEl.classList.toggle("error", isError);
+}
+
+// Allow deep links like index.html#gengar, and a default so the page isn't blank.
+const initial = decodeURIComponent(location.hash.slice(1)) || "pikachu";
+queryInput.value = initial;
+lookup(initial);
+</script>
+</body>
+</html>
