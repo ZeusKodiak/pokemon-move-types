@@ -306,7 +306,10 @@ form.addEventListener("submit", (event) => {
   lookup(matches.length ? matches[0].name : queryInput.value);
 });
 
-queryInput.addEventListener("input", () => renderPicker(queryInput.value));
+queryInput.addEventListener("input", () => {
+  updateClearButton();
+  renderPicker(queryInput.value);
+});
 
 pickerEl.addEventListener("click", pickFromButton);
 
@@ -318,6 +321,9 @@ function pickFromButton(event) {
   const button = event.target.closest("button[data-name]");
   if (!button) return;
   queryInput.value = button.dataset.name;
+  // Setting the value in code fires no input event, so Clear won't notice the
+  // box has filled up unless it is told.
+  updateClearButton();
   lookup(button.dataset.name);
 }
 
@@ -330,9 +336,13 @@ typeButtonsEl.addEventListener("click", (event) => {
   applyTypeFilter();
 });
 
+// Clear drops everything narrowing the list, the typed text included, so one
+// tap always gets back to the full list however it was narrowed.
 clearTypesButton.addEventListener("click", () => {
   activeTypes.clear();
+  queryInput.value = "";
   applyTypeFilter();
+  queryInput.focus();
 });
 
 async function loadPokemonList() {
@@ -351,7 +361,13 @@ function renderTypeButtons() {
       aria-pressed="${activeTypes.has(type)}"
       style="background:${TYPE_COLOURS[type]}">${type}</button>`)
     .join("");
-  clearTypesButton.hidden = activeTypes.size === 0;
+  updateClearButton();
+}
+
+// Clear covers the search box as well as the types, so it has to be reachable
+// whenever either of them is narrowing the list — not just when a type is on.
+function updateClearButton() {
+  clearTypesButton.hidden = !activeTypes.size && !queryInput.value.trim();
 }
 
 // Which Pokémon have a type is only on each Pokémon's own record, so filtering
