@@ -24,11 +24,14 @@ You can deep-link a Pokémon by adding it to the URL, e.g.
 
 ## Publishing changes
 
-The live site is served by GitHub Pages from the separate public repo
-[`ZeusKodiak/pokemon-move-types`](https://github.com/ZeusKodiak/pokemon-move-types),
-because Pages on a private repo needs a paid plan. This folder is the working
-copy; to publish an edit, copy `index.html` across to that repo's root and push
-to its `main`. Pages rebuilds on its own within a minute or two.
+This repo is the published copy. GitHub Pages serves the live site straight
+from `index.html` in its root on `main`, and it is kept public because Pages on
+a private repo needs a paid plan.
+
+Edits shouldn't be made here. The working copy lives in the private
+`super-duper-octo-happiness` repo under `projects/pokedex/`; change it there,
+copy `index.html` across to this repo's root, and push to `main`. Pages
+rebuilds on its own within a minute or two.
 
 ## How the move lists are picked
 
@@ -86,9 +89,3 @@ catch it in a given game.
   pictures in it don't cost anything extra — they're addressed by Dex number.
 - Evolution data is PokéAPI's, which flattens every game into one chain, so a
   method that only applies to one game still shows up.
-
-## About this repo
-
-This is the published copy, kept public so GitHub Pages can serve it for free.
-The working copy lives in the private `super-duper-octo-happiness` repo under
-`projects/pokedex/`; changes should be made there and copied across.
