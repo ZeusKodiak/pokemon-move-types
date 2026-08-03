@@ -1,4 +1,4 @@
-# Pokémon Move Types
+# Sammy's Pokédex
 
 A one-page app: pick a Pokémon from the filterable list — or type a name or Dex
 number — and it shows

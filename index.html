@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pokémon Move Types</title>
+<title>Sammy's Pokédex</title>
 <style>
   :root {
     --bg: #f4f5f7;
@@ -130,9 +130,9 @@
   .region { color: var(--muted); }
 
   /* Evolution line: one column per stage, side by side, arrows between. A
-     branching line (Eevee, Wurmple) stacks its options within one column. */
-  /* Centred rather than stretched, so a one-member stage sits level with the
-     middle of a branching one instead of growing to match its height. */
+     branching line (Eevee, Wurmple) stacks its options within one column, and
+     columns are centred rather than stretched, so a one-member stage sits level
+     with the middle of a branching one instead of growing to match its height. */
   .evo { display: flex; align-items: center; gap: 0.5rem; width: max-content; }
   .evo-stage { display: flex; flex-direction: column; gap: 0.5rem; }
   .evo-arrow { color: var(--muted); }
@@ -159,7 +159,7 @@
 </head>
 <body>
 <main>
-  <h1>Pokémon Move Types</h1>
+  <h1>Sammy's Pokédex</h1>
   <p class="tagline">Pick a Pokémon from the list to see its region, its types, its evolution line, and its main moves — and what type each move is. Type in the box to narrow the list down.</p>
 
   <form id="search">
