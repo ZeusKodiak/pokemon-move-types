@@ -128,12 +128,39 @@
   .picker .dexnum { color: var(--muted); font-variant-numeric: tabular-nums; }
 
   .region { color: var(--muted); }
+
+  /* Evolution line: one column per stage, side by side, arrows between. A
+     branching line (Eevee, Wurmple) stacks its options within one column. */
+  /* Centred rather than stretched, so a one-member stage sits level with the
+     middle of a branching one instead of growing to match its height. */
+  .evo { display: flex; align-items: center; gap: 0.5rem; width: max-content; }
+  .evo-stage { display: flex; flex-direction: column; gap: 0.5rem; }
+  .evo-arrow { color: var(--muted); }
+  .evo-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    width: 7.5rem;
+    padding: 0.5rem 0.4rem;
+    border-radius: 0.5rem;
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-weight: 400;
+    text-align: center;
+  }
+  .evo-member:hover, .evo-member:focus { border-color: var(--line); background: var(--bg); }
+  .evo-member.current { border-color: var(--accent); }
+  .evo-member img { width: 64px; height: 64px; image-rendering: pixelated; }
+  .evo-name { text-transform: capitalize; }
+  .evo-how { color: var(--muted); font-size: 0.8rem; line-height: 1.3; }
 </style>
 </head>
 <body>
 <main>
   <h1>Pokémon Move Types</h1>
-  <p class="tagline">Pick a Pokémon from the list to see its region, its types, and its main moves — and what type each move is. Type in the box to narrow the list down.</p>
+  <p class="tagline">Pick a Pokémon from the list to see its region, its types, its evolution line, and its main moves — and what type each move is. Type in the box to narrow the list down.</p>
 
   <form id="search">
     <input id="query" name="query" placeholder="Start typing, or scroll the list" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -151,6 +178,10 @@
 
 <script>
 const API = "https://pokeapi.co/api/v2";
+
+// Where PokéAPI's own sprite URLs point. Building them by dex number here saves
+// a request per member of an evolution line just to find the picture.
+const SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
 
 // Official type colours, used for the type pills.
 const TYPE_COLOURS = {
@@ -197,12 +228,18 @@ form.addEventListener("submit", (event) => {
 
 queryInput.addEventListener("input", () => renderPicker(queryInput.value));
 
-pickerEl.addEventListener("click", (event) => {
+pickerEl.addEventListener("click", pickFromButton);
+
+// The evolution line is made of the same data-name buttons, so a member of it
+// can be looked up by tapping it.
+resultEl.addEventListener("click", pickFromButton);
+
+function pickFromButton(event) {
   const button = event.target.closest("button[data-name]");
   if (!button) return;
   queryInput.value = button.dataset.name;
   lookup(button.dataset.name);
-});
+}
 
 async function loadPokemonList() {
   const data = await fetchJSON(`${API}/pokemon?limit=100000`);
@@ -268,11 +305,11 @@ async function lookup(rawQuery) {
   try {
     const pokemon = await fetchJSON(`${API}/pokemon/${encodeURIComponent(name)}`);
     setStatus("Loading moves…");
-    const [moves, region] = await Promise.all([
+    const [moves, extras] = await Promise.all([
       loadMainMoves(pokemon),
-      loadRegion(pokemon),
+      loadSpeciesExtras(pokemon),
     ]);
-    render(pokemon, moves, region);
+    render(pokemon, moves, extras);
     setStatus("");
     location.hash = pokemon.name;
   } catch (error) {
@@ -285,15 +322,112 @@ async function lookup(rawQuery) {
   }
 }
 
-// The region is on the species, not the Pokémon, so this is a second request.
-// A failure here should not lose the moves, so fall back to an empty label.
-async function loadRegion(pokemon) {
+// The region and the evolution line both hang off the species rather than the
+// Pokémon, so one species request feeds both. A failure here should not lose
+// the moves, so each part falls back to nothing rather than throwing.
+async function loadSpeciesExtras(pokemon) {
+  let species;
   try {
-    const species = await fetchJSON(pokemon.species.url);
-    return REGIONS[species.generation.name] || "";
+    species = await fetchJSON(pokemon.species.url);
   } catch {
-    return "";
+    return { region: "", evolution: null };
   }
+
+  const region = REGIONS[species.generation.name] || "";
+
+  try {
+    const chain = await fetchJSON(species.evolution_chain.url);
+    return { region, evolution: toStages(chain.chain) };
+  } catch {
+    return { region, evolution: null };
+  }
+}
+
+// The chain arrives as a tree — each node holding the species it evolves into —
+// but it reads best as stages laid left to right, so flatten it a level at a
+// time. Everything at the same depth is the same stage.
+function toStages(root) {
+  const stages = [];
+  let level = [root];
+  while (level.length) {
+    stages.push(level.map((node) => ({
+      name: node.species.name,
+      // The species id is the last path segment of its URL, and the sprite
+      // files are named by it, so no extra request is needed for the picture.
+      id: Number(node.species.url.replace(/\/$/, "").split("/").pop()),
+      how: describeEvolution(node.evolution_details),
+    })));
+    level = level.flatMap((node) => node.evolves_to);
+  }
+  return stages;
+}
+
+// A species can have several routes to the same evolution (Espeon by friendship
+// in one game, by an item in another), so describe each and join them.
+function describeEvolution(details) {
+  const ways = [...new Set(details.map(describeOneEvolution).filter(Boolean))];
+  // Only the first way starts the sentence, so the rest read on in lower case:
+  // "Use Leaf Stone, or level up at moss rock".
+  return ways
+    .map((way, i) => (i === 0 ? way : way.charAt(0).toLowerCase() + way.slice(1)))
+    .join(", or ");
+}
+
+function describeOneEvolution(detail) {
+  const parts = [];
+  const trigger = detail.trigger?.name;
+
+  if (trigger === "level-up") {
+    parts.push(detail.min_level ? `Level ${detail.min_level}` : "Level up");
+  } else if (trigger === "use-item") {
+    parts.push(`Use ${titleCase(detail.item?.name)}`);
+  } else if (trigger === "trade") {
+    parts.push("Trade");
+  } else if (trigger === "shed") {
+    parts.push("Level 21 with a spare party slot and Poké Ball");
+  } else if (trigger === "three-critical-hits") {
+    parts.push("Land three critical hits in one battle");
+  } else if (trigger === "take-damage") {
+    parts.push("Take damage in a particular place");
+  } else if (trigger === "other") {
+    parts.push("A one-off method");
+  } else if (trigger) {
+    parts.push(prettify(trigger));
+  }
+
+  // Everything below is a condition layered on top of the trigger, so the
+  // wording is designed to read on from it: "Level 16 during the night".
+  if (detail.held_item) parts.push(`holding ${titleCase(detail.held_item.name)}`);
+  if (detail.trade_species) parts.push(`for ${titleCase(detail.trade_species.name)}`);
+  if (detail.min_happiness) parts.push("with high friendship");
+  if (detail.min_affection) parts.push("with high affection");
+  if (detail.min_beauty) parts.push("with high beauty");
+  if (detail.known_move) parts.push(`knowing ${titleCase(detail.known_move.name)}`);
+  if (detail.known_move_type) parts.push(`knowing a ${prettify(detail.known_move_type.name)} move`);
+  if (detail.location) parts.push(`at ${prettify(detail.location.name)}`);
+  if (detail.time_of_day) parts.push(`during the ${detail.time_of_day}`);
+  if (detail.gender === 1) parts.push("female only");
+  if (detail.gender === 2) parts.push("male only");
+  if (detail.needs_overworld_rain) parts.push("while it is raining");
+  if (detail.party_species) parts.push(`with ${titleCase(detail.party_species.name)} in the party`);
+  if (detail.party_type) parts.push(`with a ${prettify(detail.party_type.name)} type in the party`);
+  if (detail.relative_physical_stats === 1) parts.push("with Attack above Defense");
+  if (detail.relative_physical_stats === 0) parts.push("with Attack equal to Defense");
+  if (detail.relative_physical_stats === -1) parts.push("with Attack below Defense");
+  if (detail.turn_upside_down) parts.push("with the console turned upside down");
+
+  return parts.join(" ");
+}
+
+// API names are lowercase and hyphenated; spaces read better in a sentence.
+function prettify(name) {
+  return String(name || "").replace(/-/g, " ");
+}
+
+// Items, moves and species are proper names in the games — "Use Thunder Stone"
+// rather than "use thunder stone".
+function titleCase(name) {
+  return prettify(name).replace(/\b[a-z]/g, (char) => char.toUpperCase());
 }
 
 async function fetchJSON(url) {
@@ -360,7 +494,7 @@ function shortEffect(move) {
   return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
 }
 
-function render(pokemon, moves, region) {
+function render(pokemon, moves, { region, evolution }) {
   const sprite =
     pokemon.sprites.other?.["official-artwork"]?.front_default ||
     pokemon.sprites.front_default;
@@ -380,6 +514,8 @@ function render(pokemon, moves, region) {
       </div>
     </div>
 
+    ${evolutionSection(evolution, pokemon.species.name)}
+
     <h3>Attacking moves <span class="note">— highest-power moves it can learn</span></h3>
     ${moves.damaging.length
       ? moveTable(moves.damaging)
@@ -391,6 +527,38 @@ function render(pokemon, moves, region) {
       : "<p class='status'>No status moves found for this Pokémon.</p>"}
   `;
   resultEl.appendChild(card);
+}
+
+// `current` is the species name, not the Pokémon name, so alternate forms
+// (deoxys-attack, giratina-origin) still highlight their place in the line.
+function evolutionSection(stages, current) {
+  const heading = "<h3>Evolution line</h3>";
+
+  if (!stages) {
+    return `${heading}<p class="status">Couldn't load the evolution line.</p>`;
+  }
+  if (stages.length < 2) {
+    return `${heading}
+      <div class="evo">${evoStage(stages[0], current)}</div>
+      <p class="status">This Pokémon doesn't evolve.</p>`;
+  }
+
+  const columns = stages
+    .map((stage) => evoStage(stage, current))
+    .join('<div class="evo-arrow">→</div>');
+  return `${heading}<div class="scroll"><div class="evo">${columns}</div></div>`;
+}
+
+function evoStage(stage, current) {
+  const members = stage.map((member) => `
+    <button type="button" class="evo-member${member.name === current ? " current" : ""}"
+            data-name="${escapeHTML(member.name)}">
+      <img src="${SPRITES}/${member.id}.png" alt="" loading="lazy">
+      <span class="evo-name">${escapeHTML(prettify(member.name))}</span>
+      ${member.how ? `<span class="evo-how">${escapeHTML(member.how)}</span>` : ""}
+    </button>
+  `).join("");
+  return `<div class="evo-stage">${members}</div>`;
 }
 
 function moveTable(moves) {
