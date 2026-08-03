@@ -29,13 +29,14 @@ from `index.html` in its root on `main`, and it is kept public because Pages on
 a private repo needs a paid plan.
 
 The working copy lives in the private `super-duper-octo-happiness` repo under
-`projects/pokedex/`; changes are made there and brought across to this repo's
-root, and Pages rebuilds on its own within a minute or two.
+`projects/pokedex/`; make changes there, copy `index.html` across to this repo's
+root, and push to `main`. Pages rebuilds on its own within a minute or two.
 
-**Don't copy `index.html` across wholesale.** The two copies have drifted: the
-evolution line and this app's name exist only here, and were never added to the
-working copy. A straight copy would delete them. Until the two are reconciled,
-port each change over by hand and check that what is already here survives.
+The two copies drifted apart once — the evolution line was added here and only
+brought back to the working copy later, so for a while a straight copy would
+have deleted it. They are identical again, which is what makes the plain copy
+safe. Keep it that way: if something ever has to be fixed directly here, bring
+it back to the working copy before the next publish.
 
 ## How the move lists are picked
 
