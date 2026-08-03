@@ -337,12 +337,13 @@ typeButtonsEl.addEventListener("click", (event) => {
 });
 
 // Clear drops everything narrowing the list, the typed text included, so one
-// tap always gets back to the full list however it was narrowed.
+// tap always gets back to the full list however it was narrowed. It deliberately
+// leaves focus alone: focusing the box would open the keyboard on a phone and
+// cover the list the tap was meant to reveal.
 clearTypesButton.addEventListener("click", () => {
   activeTypes.clear();
   queryInput.value = "";
   applyTypeFilter();
-  queryInput.focus();
 });
 
 async function loadPokemonList() {

@@ -84,9 +84,11 @@ type. Tap a pill to switch it on, tap it again to switch it off. Selected pills
 show in their type colour; the rest are greyed out.
 
 **Clear** drops everything narrowing the list — the selected types *and* the
-search box — so one tap always gets back to the full list, and the cursor lands
-back in the box ready to type again. It appears whenever either the box or a
-type is doing something, and hides when there is nothing left to clear.
+search box — so one tap always gets back to the full list. It appears whenever
+either the box or a type is doing something, and hides when there is nothing
+left to clear. It deliberately doesn't put the cursor in the search box: that
+would open the keyboard on a phone, covering the list the tap was meant to
+show.
 
 Picking **two or more** types means "has all of these", not "has any of these" —
 so fire + flying gives you Charizard and Moltres rather than every fire Pokémon
