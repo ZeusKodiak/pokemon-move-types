@@ -5,6 +5,7 @@ number — and it shows
 
 - the region it comes from,
 - the Pokémon's own type(s),
+- its evolution line, and what triggers each evolution,
 - its attacking moves — the highest-power moves it can learn,
 - its status moves, each with a one-line summary of what it does,
 - the type of every move, plus power, accuracy and PP.
@@ -42,6 +43,20 @@ result in two:
   they have no power to rank by. Each shows PokéAPI's one-line effect summary,
   because "Swords Dance" on its own tells you nothing.
 
+## The evolution line
+
+Every stage of the family is shown left to right, with the one you looked up
+outlined. Under each name is what triggers that evolution — a level, a stone, a
+trade, high friendship, and so on — and where a Pokémon has more than one route
+to the same evolution, both are listed ("Use Leaf Stone, or level up at moss
+rock").
+
+Families that branch, like Eevee's eight or Wurmple's two, stack their options
+in one column. A long line scrolls sideways rather than squashing.
+
+Tapping any member looks it up, so a whole family can be worked through without
+typing. A Pokémon that doesn't evolve says so.
+
 ## Picking a Pokémon
 
 The list under the search box holds every Pokémon PokéAPI knows about, so
@@ -67,6 +82,10 @@ catch it in a given game.
   The list shows these in full, so picking from it avoids the problem.
 - Move details are one HTTP request each, so the first lookup for a Pokémon
   takes a moment. Results are cached for the rest of the session.
+- The evolution line costs two more requests (the species, then its chain). The
+  pictures in it don't cost anything extra — they're addressed by Dex number.
+- Evolution data is PokéAPI's, which flattens every game into one chain, so a
+  method that only applies to one game still shows up.
 
 ## About this repo
 
