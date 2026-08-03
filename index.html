@@ -96,6 +96,46 @@
   .damage { color: var(--muted); font-size: 0.85rem; text-transform: capitalize; }
   .scroll { overflow-x: auto; }
 
+  .filter { margin-bottom: 1rem; }
+  .filter-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+  .filter-head h2 { font-size: 0.8rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .filter-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .filter-buttons button {
+    /* Same pill as .type, but drained of colour until it is switched on. */
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+    /* Off pills drain their colour rather than fading out, so the white label
+       stays readable against them. */
+    filter: grayscale(0.85) brightness(0.95);
+  }
+  .filter-buttons button[aria-pressed="true"] {
+    filter: none;
+    border-color: var(--text);
+  }
+  .filter-buttons button:hover, .filter-buttons button:focus { filter: none; }
+  .clear {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .clear[hidden] { display: none; }
+
   #pickerBox { margin-bottom: 1.5rem; }
   #pickerCount { margin: 0 0 0.4rem; font-size: 0.85rem; }
   .picker {
@@ -160,12 +200,20 @@
 <body>
 <main>
   <h1>Sammy's Pokédex</h1>
-  <p class="tagline">Pick a Pokémon from the list to see its region, its types, its evolution line, and its main moves — and what type each move is. Type in the box to narrow the list down.</p>
+  <p class="tagline">Pick a Pokémon from the list to see its region, its types, its evolution line, and its main moves — and what type each move is. Type in the box, or tap a type, to narrow the list down.</p>
 
   <form id="search">
     <input id="query" name="query" placeholder="Start typing, or scroll the list" autocomplete="off" autocapitalize="off" spellcheck="false">
     <button type="submit">Look up</button>
   </form>
+
+  <div class="filter">
+    <div class="filter-head">
+      <h2>Filter by type</h2>
+      <button type="button" id="clearTypes" class="clear" hidden>Clear</button>
+    </div>
+    <div id="typeButtons" class="filter-buttons"></div>
+  </div>
 
   <div id="pickerBox">
     <p id="pickerCount" class="status"></p>
@@ -192,13 +240,29 @@ const TYPE_COLOURS = {
   steel: "#5f8f9f", fairy: "#e397d1",
 };
 
-// PokéAPI groups Pokémon by generation, not by region, so map across. Each
-// generation was introduced in exactly one region.
+// PokéAPI groups Pokémon by generation, not by region, so map across. This is
+// where a species was introduced, which the two lookups below then correct for.
 const REGIONS = {
   "generation-i": "Kanto", "generation-ii": "Johto", "generation-iii": "Hoenn",
   "generation-iv": "Sinnoh", "generation-v": "Unova", "generation-vi": "Kalos",
   "generation-vii": "Alola", "generation-viii": "Galar", "generation-ix": "Paldea",
 };
+
+// Regional variants are a form of an older species, so the species generation
+// points at the wrong place: Alolan Raichu is a Kanto species but an Alolan
+// Pokémon. The form's own region is in its name, so no extra request is needed.
+const FORM_REGIONS = {
+  alola: "Alola", galar: "Galar", hisui: "Hisui", paldea: "Paldea",
+};
+
+// Hisui's variants are the exception that skips the naming convention above.
+const NAMED_VARIANTS = { "basculin-white-striped": "Hisui" };
+
+// Generation VIII is the one generation spanning two regions: most of it is
+// Galar, but Legends: Arceus introduced these seven in Hisui.
+const HISUI_SPECIES = new Set([
+  "wyrdeer", "kleavor", "ursaluna", "basculegion", "sneasler", "overqwil", "enamorus",
+]);
 
 // Long lists are slow to render on a phone, so cap what is shown at once.
 const MAX_LISTED = 200;
@@ -210,12 +274,28 @@ const statusEl = document.getElementById("status");
 const resultEl = document.getElementById("result");
 const pickerEl = document.getElementById("picker");
 const pickerCountEl = document.getElementById("pickerCount");
+const typeButtonsEl = document.getElementById("typeButtons");
+const clearTypesButton = document.getElementById("clearTypes");
 
 // Move details are fetched one request per move, so cache them across lookups.
 const moveCache = new Map();
 
 // Every Pokémon name, fetched once so filtering happens locally with no lag.
 let allPokemon = [];
+
+// Which type buttons are switched on, and one cached membership list per type.
+const activeTypes = new Set();
+const typeCache = new Map();
+
+// Names allowed through by the type filter, or null when no type is selected.
+// Rebuilt whenever the selection changes, so name filtering stays synchronous.
+let typeMatches = null;
+
+// Type lists arrive over the network, so tag each request and drop stale replies.
+let typeRequestId = 0;
+
+// Same idea for Pokémon lookups, which can also overlap. See lookup().
+let lookupId = 0;
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -241,6 +321,20 @@ function pickFromButton(event) {
   lookup(button.dataset.name);
 }
 
+typeButtonsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-type]");
+  if (!button) return;
+  const type = button.dataset.type;
+  if (activeTypes.has(type)) activeTypes.delete(type);
+  else activeTypes.add(type);
+  applyTypeFilter();
+});
+
+clearTypesButton.addEventListener("click", () => {
+  activeTypes.clear();
+  applyTypeFilter();
+});
+
 async function loadPokemonList() {
   const data = await fetchJSON(`${API}/pokemon?limit=100000`);
   allPokemon = data.results.map((entry) => ({
@@ -251,10 +345,66 @@ async function loadPokemonList() {
   renderPicker(queryInput.value);
 }
 
+function renderTypeButtons() {
+  typeButtonsEl.innerHTML = Object.keys(TYPE_COLOURS)
+    .map((type) => `<button type="button" data-type="${type}"
+      aria-pressed="${activeTypes.has(type)}"
+      style="background:${TYPE_COLOURS[type]}">${type}</button>`)
+    .join("");
+  clearTypesButton.hidden = activeTypes.size === 0;
+}
+
+// Which Pokémon have a type is only on each Pokémon's own record, so filtering
+// locally would be one request per Pokémon. The type endpoint gives the whole
+// membership list in one go instead, and it never changes, so cache it.
+function loadType(type) {
+  if (!typeCache.has(type)) {
+    typeCache.set(
+      type,
+      fetchJSON(`${API}/type/${type}`)
+        .then((data) => new Set(data.pokemon.map((entry) => entry.pokemon.name)))
+        // Don't cache a failure, or a blip would wedge that type until reload.
+        .catch((error) => {
+          typeCache.delete(type);
+          throw error;
+        })
+    );
+  }
+  return typeCache.get(type);
+}
+
+async function applyTypeFilter() {
+  renderTypeButtons();
+  const requestId = ++typeRequestId;
+
+  if (!activeTypes.size) {
+    typeMatches = null;
+    renderPicker(queryInput.value);
+    return;
+  }
+
+  const wanted = [...activeTypes];
+  pickerCountEl.textContent = "Loading type list…";
+  try {
+    const sets = await Promise.all(wanted.map(loadType));
+    // A slower earlier request must not overwrite a newer selection.
+    if (requestId !== typeRequestId) return;
+    // Several types selected means "has all of these", so a dual-type search
+    // like fire + flying lands on Charizard rather than every fire Pokémon.
+    typeMatches = sets.reduce((kept, set) => new Set([...kept].filter((name) => set.has(name))));
+    renderPicker(queryInput.value);
+  } catch (error) {
+    if (requestId !== typeRequestId) return;
+    typeMatches = null;
+    pickerCountEl.textContent = "Couldn't load that type's list — try again.";
+  }
+}
+
 function filterPokemon(rawQuery) {
+  const pool = typeMatches ? allPokemon.filter((p) => typeMatches.has(p.name)) : allPokemon;
   const needle = rawQuery.trim().toLowerCase().replace(/[\s-]/g, "");
-  if (!needle) return allPokemon;
-  const matches = allPokemon.filter(
+  if (!needle) return pool;
+  const matches = pool.filter(
     (p) => p.name.replace(/-/g, "").includes(needle) || String(p.id) === needle
   );
   // Names that start with what was typed are the likelier intent, so float
@@ -284,13 +434,21 @@ function renderPicker(rawQuery) {
     )
     .join("");
 
+  // Say which filters are in play, so an empty list never looks like a bug.
+  const parts = [];
+  if (rawQuery.trim()) parts.push(`"${rawQuery.trim()}"`);
+  if (activeTypes.size) parts.push([...activeTypes].join(" + "));
+  const criteria = parts.join(" and ");
+
   if (!matches.length) {
-    pickerCountEl.textContent = `Nothing matches "${rawQuery.trim()}".`;
+    pickerCountEl.textContent = `Nothing matches ${criteria}.`;
   } else if (matches.length > shown.length) {
     pickerCountEl.textContent =
       `Showing ${shown.length} of ${matches.length} — keep typing to narrow it down.`;
   } else {
-    pickerCountEl.textContent = `${matches.length} match${matches.length === 1 ? "" : "es"}.`;
+    const suffix = criteria ? ` for ${criteria}` : "";
+    pickerCountEl.textContent =
+      `${matches.length} match${matches.length === 1 ? "" : "es"}${suffix}.`;
   }
 }
 
@@ -298,27 +456,40 @@ async function lookup(rawQuery) {
   const name = rawQuery.trim().toLowerCase().replace(/\s+/g, "-");
   if (!name) return;
 
+  // Picking from the list — or from the evolution line — isn't gated the way the
+  // submit button is, so a second lookup can start while the first is still in
+  // flight. Tag each one and let only the newest write to the page: a superseded
+  // lookup that rendered anyway would append its card below the new one, leaving
+  // two Pokémon on screen.
+  const requestId = ++lookupId;
   submitButton.disabled = true;
   resultEl.innerHTML = "";
   setStatus("Looking up " + name + "…");
 
   try {
     const pokemon = await fetchJSON(`${API}/pokemon/${encodeURIComponent(name)}`);
+    if (requestId !== lookupId) return;
     setStatus("Loading moves…");
     const [moves, extras] = await Promise.all([
       loadMainMoves(pokemon),
       loadSpeciesExtras(pokemon),
     ]);
+    if (requestId !== lookupId) return;
     render(pokemon, moves, extras);
     setStatus("");
     location.hash = pokemon.name;
   } catch (error) {
+    // An overtaken lookup's failure isn't worth reporting — the newer one owns
+    // the status line now, and may well be succeeding.
+    if (requestId !== lookupId) return;
     const message = error.status === 404
       ? `No Pokémon called "${name}". Check the spelling — forms need a suffix, like "deoxys-normal".`
       : `Couldn't load that: ${error.message}`;
     setStatus(message, true);
   } finally {
-    submitButton.disabled = false;
+    // Re-enabling from a superseded lookup would unlock the button while the
+    // newest one is still loading.
+    if (requestId === lookupId) submitButton.disabled = false;
   }
 }
 
@@ -326,21 +497,42 @@ async function lookup(rawQuery) {
 // Pokémon, so one species request feeds both. A failure here should not lose
 // the moves, so each part falls back to nothing rather than throwing.
 async function loadSpeciesExtras(pokemon) {
+  // A regional variant's own region is in its name, so it survives even if the
+  // species request below fails.
+  const variant = variantRegion(pokemon.name);
+
   let species;
   try {
     species = await fetchJSON(pokemon.species.url);
   } catch {
-    return { region: "", evolution: null };
+    return { region: variant, origin: "", evolution: null };
   }
 
-  const region = REGIONS[species.generation.name] || "";
+  // Where the species started out, which is a different place from the variant's
+  // region for the likes of Alolan Raichu — a Kanto species, an Alolan Pokémon.
+  const home = HISUI_SPECIES.has(species.name)
+    ? "Hisui"
+    : REGIONS[species.generation.name] || "";
+  const region = variant || home;
+  const origin = variant && variant !== home ? home : "";
 
   try {
     const chain = await fetchJSON(species.evolution_chain.url);
-    return { region, evolution: toStages(chain.chain) };
+    return { region, origin, evolution: toStages(chain.chain) };
   } catch {
-    return { region, evolution: null };
+    return { region, origin, evolution: null };
   }
+}
+
+function variantRegion(name) {
+  if (NAMED_VARIANTS[name]) return NAMED_VARIANTS[name];
+  // Ash's caps are named after the region of the series arc, not a variant —
+  // pikachu-alola-cap is a Kanto Pikachu in a hat.
+  if (name.endsWith("-cap")) return "";
+  for (const part of name.split("-")) {
+    if (FORM_REGIONS[part]) return FORM_REGIONS[part];
+  }
+  return "";
 }
 
 // The chain arrives as a tree — each node holding the species it evolves into —
@@ -494,7 +686,7 @@ function shortEffect(move) {
   return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
 }
 
-function render(pokemon, moves, { region, evolution }) {
+function render(pokemon, moves, { region, origin, evolution }) {
   const sprite =
     pokemon.sprites.other?.["official-artwork"]?.front_default ||
     pokemon.sprites.front_default;
@@ -509,6 +701,7 @@ function render(pokemon, moves, { region, evolution }) {
         <div class="dex">
           #${String(pokemon.id).padStart(4, "0")}
           ${region ? `<span class="region">· ${escapeHTML(region)} region</span>` : ""}
+          ${origin ? `<span class="region">· originally ${escapeHTML(origin)}</span>` : ""}
         </div>
         <div class="types">${pokemon.types.map((t) => typePill(t.type.name)).join("")}</div>
       </div>
@@ -598,6 +791,9 @@ function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
 }
+
+// The type buttons are built from a fixed list, so they can go up immediately.
+renderTypeButtons();
 
 // Allow deep links like index.html#gengar, and a default so the page isn't blank.
 const initial = decodeURIComponent(location.hash.slice(1)) || "pikachu";

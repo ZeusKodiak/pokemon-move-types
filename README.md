@@ -1,7 +1,7 @@
 # Sammy's Pokédex
 
-A one-page app: pick a Pokémon from the filterable list — or type a name or Dex
-number — and it shows
+A one-page app: pick a Pokémon from the filterable list — filter by type, or
+type a name or Dex number — and it shows
 
 - the region it comes from,
 - the Pokémon's own type(s),
@@ -28,10 +28,14 @@ This repo is the published copy. GitHub Pages serves the live site straight
 from `index.html` in its root on `main`, and it is kept public because Pages on
 a private repo needs a paid plan.
 
-Edits shouldn't be made here. The working copy lives in the private
-`super-duper-octo-happiness` repo under `projects/pokedex/`; change it there,
-copy `index.html` across to this repo's root, and push to `main`. Pages
-rebuilds on its own within a minute or two.
+The working copy lives in the private `super-duper-octo-happiness` repo under
+`projects/pokedex/`; changes are made there and brought across to this repo's
+root, and Pages rebuilds on its own within a minute or two.
+
+**Don't copy `index.html` across wholesale.** The two copies have drifted: the
+evolution line and this app's name exist only here, and were never added to the
+working copy. A straight copy would delete them. Until the two are reconciled,
+port each change over by hand and check that what is already here survives.
 
 ## How the move lists are picked
 
@@ -72,12 +76,49 @@ top match.
 The list is capped at 200 rows on screen at a time to keep scrolling smooth on
 a phone; the count above it says when there are more.
 
+## Filtering by type
+
+The row of type pills under the search box narrows the list to Pokémon of that
+type. Tap a pill to switch it on, tap it again to switch it off, or use
+**Clear** to drop them all. Selected pills show in their type colour; the rest
+are greyed out.
+
+Picking **two or more** types means "has all of these", not "has any of these" —
+so fire + flying gives you Charizard and Moltres rather than every fire Pokémon
+plus every flying one. Combinations nothing has, like fire + water, come back
+empty.
+
+Typing in the search box works alongside the type filter, and both apply at
+once: with fire selected, `char` gives just the Charmander line. The count above
+the list names whichever filters are in play, so an empty list never looks like
+a fault.
+
+Type membership comes from PokéAPI's `/type` endpoint — one request per type,
+which is why the list flickers to "Loading type list…" the first time a pill is
+used. Each type is cached for the rest of the session, so switching back is
+instant.
+
 ## Regions
 
 PokéAPI records a *generation*, not a region, so the app maps one to the other —
 generation I is Kanto, II is Johto, and so on through to IX being Paldea. That
 is the region a species was introduced in, which is not always where you can
 catch it in a given game.
+
+Two things that mapping gets wrong on its own, both corrected:
+
+**Regional variants.** A variant is a *form* of an older species, so the
+species' generation points at the wrong place — Alolan Raichu would come out as
+Kanto. The form's region is in its name (`raichu-alola`, `meowth-galar`,
+`growlithe-hisui`, `wooper-paldea`), so the app reads it from there and shows
+both: "Alola region · originally Kanto". Two exceptions are handled by name —
+Hisuian Basculin is `basculin-white-striped` rather than `-hisui`, and Ash's cap
+Pikachu (`pikachu-alola-cap`) is a Kanto Pikachu in a hat, not an Alolan one.
+
+**Generation VIII covers two regions.** Most of it is Galar, but Legends:
+Arceus introduced Wyrdeer, Kleavor, Ursaluna, Basculegion, Sneasler, Overqwil
+and Enamorus in Hisui. Those seven are listed explicitly; the rest of the
+generation stays Galar.
 
 ## Notes
 
