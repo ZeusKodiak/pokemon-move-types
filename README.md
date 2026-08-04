@@ -1,7 +1,9 @@
 # Sammy's Pokédex
 
-A one-page app: pick a Pokémon from the filterable list — filter by type, or
-type a name or Dex number — and it shows
+A one-page app with two tabs.
+
+**Pokémon** — pick one from the filterable list (filter by type, or type a name
+or Dex number) and it shows
 
 - the region it comes from,
 - the Pokémon's own type(s),
@@ -9,6 +11,9 @@ type a name or Dex number — and it shows
 - its attacking moves — the highest-power moves it can learn,
 - its status moves, each with a one-line summary of what it does,
 - the type of every move, plus power, accuracy and PP.
+
+**Type matchups** — pick a type and it shows what that type is strong and weak
+against, attacking and defending.
 
 ## Using it
 
@@ -20,7 +25,8 @@ build step, no server. Either way it needs an internet connection, because the
 data comes live from [PokéAPI](https://pokeapi.co).
 
 You can deep-link a Pokémon by adding it to the URL, e.g.
-`https://zeuskodiak.github.io/pokemon-move-types/#gengar`.
+`https://zeuskodiak.github.io/pokemon-move-types/#gengar`, and a type's matchups
+the same way with `#types/ghost`.
 
 ## Publishing changes
 
@@ -105,6 +111,39 @@ which is why the list flickers to "Loading type list…" the first time a pill i
 used. Each type is cached for the rest of the session, so switching back is
 instant.
 
+## Type matchups
+
+The second tab answers the question the move list raises: a Gengar with a ghost
+move — is that any good against what you're facing?
+
+Pick a type from the row of pills and it splits the answer into the two
+questions actually being asked:
+
+- **Attacking** — what a move of that type does: super effective (×2), not very
+  effective (×½), no effect at all (×0).
+- **Defending** — what a Pokémon of that type takes: weak to (×2), resists (×½),
+  immune to (×0).
+
+Anything not listed does normal damage, so the rows stay short — listing the ten
+or so neutral types every time would bury the ones that matter. A row with
+nothing in it says "Nothing", so it never looks like a loading failure.
+
+Every type named in an answer is itself a pill you can tap, which looks that one
+up next — so "ghost is weak to dark" leads straight to what dark is weak to,
+without scrolling back to the buttons.
+
+The tab opens on the type of whatever Pokémon is showing on the other tab: look
+up Charizard, tap across, and it is already on fire.
+
+Two-type Pokémon multiply both of their types together, which is why a
+rock/flying one takes ×4 from an electric move. The app says so in a line under
+the table rather than trying to work out every pair — the row of pills is for
+one type at a time.
+
+The numbers are PokéAPI's `damage_relations`, from the same `/type` request the
+filter on the other tab already makes, so the two share a cache: filtering by
+fire and then opening fire's matchups costs one request, not two.
+
 ## Regions
 
 PokéAPI records a *generation*, not a region, so the app maps one to the other —
@@ -129,6 +168,9 @@ generation stays Galar.
 
 ## Notes
 
+- Whichever tab you are on puts itself in the URL, so the browser's Back button
+  steps back through the Pokémon you looked up and the tabs you switched
+  between, and any point in that is a link you can share.
 - Alternate forms need their full name, e.g. `deoxys-normal`, `giratina-origin`.
   The list shows these in full, so picking from it avoids the problem.
 - Move details are one HTTP request each, so the first lookup for a Pokémon

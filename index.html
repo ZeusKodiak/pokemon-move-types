@@ -35,6 +35,26 @@
   h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
   .tagline { color: var(--muted); margin: 0 0 1.5rem; }
 
+  /* Tabs sit on the line under them, so the selected one looks joined to its
+     panel: its own bottom border covers that stretch of the line. */
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0.75rem 0 1.5rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .tabs button {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.6rem 0.9rem;
+    color: var(--muted);
+  }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .tabs button:hover, .tabs button:focus { color: var(--text); }
+
   form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
   input, button {
     font: inherit;
@@ -78,6 +98,15 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.35);
     white-space: nowrap;
   }
+
+  /* A type pill that can be tapped to look that type up. The generic button
+     rules above give it a colour and a chunky padding it doesn't want. */
+  button.type {
+    border: 0;
+    cursor: pointer;
+    padding: 0.15rem 0.6rem;
+  }
+  button.type:hover, button.type:focus { outline: 2px solid var(--text); outline-offset: 1px; }
 
   h3 { margin: 1.75rem 0 0.5rem; font-size: 1rem; }
   h3 .note { font-weight: 400; color: var(--muted); }
@@ -195,11 +224,34 @@
   .evo-member img { width: 64px; height: 64px; image-rendering: pixelated; }
   .evo-name { text-transform: capitalize; }
   .evo-how { color: var(--muted); font-size: 0.8rem; line-height: 1.3; }
+
+  /* Type matchups: one row per multiplier, label above its pills rather than
+     beside them, so a row of six pills doesn't get squeezed on a phone. */
+  .matchup-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  /* The pill carries the type's name, so the heading beside it only has to
+     finish the phrase: "fire type". */
+  .matchup-head h2 { margin: 0; font-size: 1.35rem; }
+  .matchup-row { padding: 0.7rem 0; border-bottom: 1px solid var(--line); }
+  .matchup-row:last-child { border-bottom: 0; }
+  .matchup-label { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.45rem; }
+  .matchup-mult {
+    color: var(--text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .matchup-none { color: var(--muted); font-size: 0.9rem; }
 </style>
 </head>
 <body>
 <main>
   <h1>Sammy's Pokédex</h1>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="dex" aria-selected="true" aria-controls="dexPanel">Pokémon</button>
+    <button type="button" role="tab" data-tab="types" aria-selected="false" aria-controls="typesPanel">Type matchups</button>
+  </div>
+
+<section id="dexPanel" role="tabpanel">
   <p class="tagline">Pick a Pokémon from the list to see its region, its types, its evolution line, and its main moves — and what type each move is. Type in the box, or tap a type, to narrow the list down.</p>
 
   <form id="search">
@@ -222,6 +274,21 @@
 
   <p id="status" class="status"></p>
   <div id="result"></div>
+</section>
+
+<section id="typesPanel" role="tabpanel" hidden>
+  <p class="tagline">Pick a type to see what it is strong and weak against — both for its moves, and for a Pokémon of that type being attacked. Tap any type in the answers to look that one up next.</p>
+
+  <div class="filter">
+    <div class="filter-head">
+      <h2>Pick a type</h2>
+    </div>
+    <div id="matchupButtons" class="filter-buttons"></div>
+  </div>
+
+  <p id="matchupStatus" class="status"></p>
+  <div id="matchup"></div>
+</section>
 </main>
 
 <script>
@@ -276,6 +343,14 @@ const pickerEl = document.getElementById("picker");
 const pickerCountEl = document.getElementById("pickerCount");
 const typeButtonsEl = document.getElementById("typeButtons");
 const clearTypesButton = document.getElementById("clearTypes");
+const tabsEl = document.querySelector(".tabs");
+const panels = {
+  dex: document.getElementById("dexPanel"),
+  types: document.getElementById("typesPanel"),
+};
+const matchupButtonsEl = document.getElementById("matchupButtons");
+const matchupStatusEl = document.getElementById("matchupStatus");
+const matchupEl = document.getElementById("matchup");
 
 // Move details are fetched one request per move, so cache them across lookups.
 const moveCache = new Map();
@@ -296,6 +371,19 @@ let typeRequestId = 0;
 
 // Same idea for Pokémon lookups, which can also overlap. See lookup().
 let lookupId = 0;
+
+// Which tab is showing, and what each one would put in the URL: the last
+// Pokémon looked up, and the type whose matchups are on screen. Both tabs write
+// to the same hash, so only the one being shown gets to set it.
+let activeTab = "dex";
+let currentPokemon = "";
+let currentTypes = [];
+let matchupType = "";
+let matchupRequestId = 0;
+
+// The last hash the app wrote itself, so the hashchange listener can tell its
+// own writes apart from the Back button.
+let lastHash = "";
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -346,6 +434,23 @@ clearTypesButton.addEventListener("click", () => {
   applyTypeFilter();
 });
 
+tabsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-tab]");
+  if (button) showTab(button.dataset.tab);
+});
+
+matchupButtonsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-type]");
+  if (button) showMatchups(button.dataset.type);
+});
+
+// Every type named in an answer is a pill you can tap, so one type leads to the
+// next without scrolling back up to the row of buttons.
+matchupEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-type]");
+  if (button) showMatchups(button.dataset.type);
+});
+
 async function loadPokemonList() {
   const data = await fetchJSON(`${API}/pokemon?limit=100000`);
   allPokemon = data.results.map((entry) => ({
@@ -371,15 +476,14 @@ function updateClearButton() {
   clearTypesButton.hidden = !activeTypes.size && !queryInput.value.trim();
 }
 
-// Which Pokémon have a type is only on each Pokémon's own record, so filtering
-// locally would be one request per Pokémon. The type endpoint gives the whole
-// membership list in one go instead, and it never changes, so cache it.
-function loadType(type) {
+// One request per type, serving both the filter below and the matchups tab: the
+// type record carries its membership list and its damage relations together, and
+// neither ever changes, so cache the whole thing.
+function loadTypeData(type) {
   if (!typeCache.has(type)) {
     typeCache.set(
       type,
       fetchJSON(`${API}/type/${type}`)
-        .then((data) => new Set(data.pokemon.map((entry) => entry.pokemon.name)))
         // Don't cache a failure, or a blip would wedge that type until reload.
         .catch((error) => {
           typeCache.delete(type);
@@ -388,6 +492,14 @@ function loadType(type) {
     );
   }
   return typeCache.get(type);
+}
+
+// Which Pokémon have a type is only on each Pokémon's own record, so filtering
+// locally would be one request per Pokémon. The type endpoint gives the whole
+// membership list in one go instead.
+async function loadType(type) {
+  const data = await loadTypeData(type);
+  return new Set(data.pokemon.map((entry) => entry.pokemon.name));
 }
 
 async function applyTypeFilter() {
@@ -494,7 +606,9 @@ async function lookup(rawQuery) {
     if (requestId !== lookupId) return;
     render(pokemon, moves, extras);
     setStatus("");
-    location.hash = pokemon.name;
+    currentPokemon = pokemon.name;
+    currentTypes = pokemon.types.map((entry) => entry.type.name);
+    updateHash();
   } catch (error) {
     // An overtaken lookup's failure isn't worth reporting — the newer one owns
     // the status line now, and may well be succeeding.
@@ -798,6 +912,155 @@ function typePill(name) {
   return `<span class="type" style="background:${colour}">${escapeHTML(name)}</span>`;
 }
 
+// Same pill, but tappable — used in the matchup answers.
+function typePillButton(name) {
+  const colour = TYPE_COLOURS[name] || "#777";
+  return `<button type="button" class="type" data-type="${escapeHTML(name)}"
+    style="background:${colour}">${escapeHTML(name)}</button>`;
+}
+
+/* ---- Tabs ---------------------------------------------------------------- */
+
+function showTab(name) {
+  activeTab = name;
+  for (const button of tabsEl.querySelectorAll("button[data-tab]")) {
+    button.setAttribute("aria-selected", String(button.dataset.tab === name));
+  }
+  for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== name;
+
+  // Opening the matchups with nothing chosen picks up the type of whatever is
+  // on the Pokémon tab, so looking up Charizard and tapping across lands on
+  // fire rather than on an empty page.
+  if (name === "types" && !matchupType) {
+    showMatchups(currentTypes[0] || "normal");
+    return;
+  }
+  updateHash();
+}
+
+// Both tabs want the hash, so whichever is showing owns it. Nothing is written
+// until there is something to write, or the first lookup would clear a
+// deep link to a type before it has been read.
+function updateHash() {
+  const target = activeTab === "types" ? matchupType : currentPokemon;
+  if (!target) return;
+  lastHash = activeTab === "types" ? `types/${target}` : target;
+  if (readHash() !== lastHash) location.hash = lastHash;
+}
+
+function readHash() {
+  return decodeURIComponent(location.hash.slice(1));
+}
+
+// Switching tabs and picking things both write to the hash, so each one leaves a
+// history entry and Back is the obvious way out of them. Route on the way back,
+// ignoring the app's own writes so this can't loop.
+window.addEventListener("hashchange", () => {
+  const hash = readHash();
+  if (hash === lastHash) return;
+  lastHash = hash;
+  routeTo(hash);
+});
+
+function routeTo(hash) {
+  const typeLink = hash.match(/^types(?:\/(.+))?$/);
+  if (typeLink) {
+    if (TYPE_COLOURS[typeLink[1]]) showMatchups(typeLink[1]);
+    showTab("types");
+    return;
+  }
+  showTab("dex");
+  if (hash && hash !== currentPokemon) {
+    queryInput.value = hash;
+    updateClearButton();
+    lookup(hash);
+  }
+}
+
+/* ---- Type matchups ------------------------------------------------------- */
+
+// The six ways a type can matter, split into the two questions actually being
+// asked: what do my moves do to them, and what do their moves do to me.
+const ATTACK_RELATIONS = [
+  ["double_damage_to", "Super effective against", "×2"],
+  ["half_damage_to", "Not very effective against", "×½"],
+  ["no_damage_to", "No effect on", "×0"],
+];
+const DEFEND_RELATIONS = [
+  ["double_damage_from", "Weak to", "×2"],
+  ["half_damage_from", "Resists", "×½"],
+  ["no_damage_from", "Immune to", "×0"],
+];
+
+async function showMatchups(type) {
+  matchupType = type;
+  renderMatchupButtons();
+  updateHash();
+
+  // Tapping through types faster than the network answers would otherwise let
+  // an earlier reply land last. Same guard as the type filter and lookups.
+  const requestId = ++matchupRequestId;
+  matchupEl.innerHTML = "";
+  setMatchupStatus(`Loading ${type} matchups…`);
+
+  try {
+    const data = await loadTypeData(type);
+    if (requestId !== matchupRequestId) return;
+    renderMatchups(type, data.damage_relations);
+    setMatchupStatus("");
+  } catch (error) {
+    if (requestId !== matchupRequestId) return;
+    setMatchupStatus(`Couldn't load the ${type} matchups — try again.`, true);
+  }
+}
+
+function renderMatchupButtons() {
+  matchupButtonsEl.innerHTML = Object.keys(TYPE_COLOURS)
+    .map((type) => `<button type="button" data-type="${type}"
+      aria-pressed="${type === matchupType}"
+      style="background:${TYPE_COLOURS[type]}">${type}</button>`)
+    .join("");
+}
+
+function renderMatchups(type, relations) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="matchup-head">
+      ${typePill(type)}
+      <h2>type</h2>
+    </div>
+
+    <h3>Attacking <span class="note">— a ${escapeHTML(type)} move against…</span></h3>
+    ${matchupRows(ATTACK_RELATIONS, relations)}
+
+    <h3>Defending <span class="note">— a ${escapeHTML(type)} Pokémon hit by…</span></h3>
+    ${matchupRows(DEFEND_RELATIONS, relations)}
+
+    <p class="status">Everything not listed does normal damage (×1). A Pokémon with
+    two types multiplies both, so a rock/flying one is hit four times as hard by
+    an electric move.</p>
+  `;
+  matchupEl.appendChild(card);
+}
+
+function matchupRows(rows, relations) {
+  return rows.map(([key, label, multiplier]) => {
+    const types = (relations[key] || []).map((entry) => entry.name);
+    return `<div class="matchup-row">
+      <div class="matchup-label">${escapeHTML(label)} <span class="matchup-mult">${multiplier}</span></div>
+      ${types.length
+        ? `<div class="types">${types.map(typePillButton).join("")}</div>`
+        : `<div class="matchup-none">Nothing.</div>`}
+    </div>`;
+  }).join("");
+}
+
+function setMatchupStatus(message, isError = false) {
+  matchupStatusEl.textContent = message;
+  matchupStatusEl.classList.toggle("error", isError);
+}
+
 function escapeHTML(text) {
   return String(text).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -811,10 +1074,22 @@ function setStatus(message, isError = false) {
 
 // The type buttons are built from a fixed list, so they can go up immediately.
 renderTypeButtons();
+renderMatchupButtons();
 
-// Allow deep links like index.html#gengar, and a default so the page isn't blank.
-const initial = decodeURIComponent(location.hash.slice(1)) || "pikachu";
-lookup(initial);
+// Allow deep links like index.html#gengar for a Pokémon and index.html#types/fire
+// for a matchup. The Pokémon tab loads either way — it is the one you come back
+// to — with a default so it is never blank.
+const startHash = readHash();
+lastHash = startHash;
+const startsOnTypes = /^types(\/|$)/.test(startHash);
+
+// The Pokémon tab loads either way — it is the one you come back to — with a
+// default so it is never blank.
+lookup(startsOnTypes ? "pikachu" : startHash || "pikachu");
+
+// A type named in the link is chosen before the tab opens, so showTab finds one
+// already set. Without one it falls back to the type of the Pokémon above.
+if (startsOnTypes) routeTo(startHash);
 
 // The list is a separate request, so let it load alongside the first lookup
 // rather than holding the page up. The box starts empty so the full list shows.
