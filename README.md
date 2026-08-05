@@ -6,6 +6,7 @@ A one-page app with two tabs.
 or Dex number) and it shows
 
 - the region it comes from,
+- its category — the "Mouse Pokémon" line the games print,
 - the Pokémon's own type(s),
 - its evolution line, and what triggers each evolution,
 - its attacking moves — the highest-power moves it can learn,
@@ -143,6 +144,22 @@ one type at a time.
 The numbers are PokéAPI's `damage_relations`, from the same `/type` request the
 filter on the other tab already makes, so the two share a cache: filtering by
 fire and then opening fire's matchups costs one request, not two.
+
+## Categories
+
+Under the dex number and region is the Pokémon's category — Pikachu is the
+Mouse Pokémon, Bulbasaur the Seed Pokémon. It is the same line the games print
+next to the height and weight, and it costs nothing to show: PokéAPI calls it a
+*genus* and keeps it on the species record the region and the evolution line
+already come from, so no extra request is made for it.
+
+A genus is stored per language, so the app picks the English one. The handful of
+entries with no English genus at all just leave the line out rather than showing
+an empty one.
+
+Category follows the species, not the form, which is what you want: Alolan
+Raichu is a Mouse Pokémon like every other Raichu, even though its region line
+says Alola.
 
 ## Regions
 

@@ -198,6 +198,10 @@
 
   .region { color: var(--muted); }
 
+  /* The category ("Mouse Pokémon") is its own field in the official Pokédex, so
+     it gets its own line rather than being tacked onto the dex number. */
+  .category { color: var(--muted); margin-top: 0.15rem; }
+
   /* Evolution line: one column per stage, side by side, arrows between. A
      branching line (Eevee, Wurmple) stacks its options within one column, and
      columns are centred rather than stretched, so a one-member stage sits level
@@ -624,9 +628,10 @@ async function lookup(rawQuery) {
   }
 }
 
-// The region and the evolution line both hang off the species rather than the
-// Pokémon, so one species request feeds both. A failure here should not lose
-// the moves, so each part falls back to nothing rather than throwing.
+// The region, the category and the evolution line all hang off the species
+// rather than the Pokémon, so one species request feeds all three. A failure
+// here should not lose the moves, so each part falls back to nothing rather
+// than throwing.
 async function loadSpeciesExtras(pokemon) {
   // A regional variant's own region is in its name, so it survives even if the
   // species request below fails.
@@ -636,8 +641,10 @@ async function loadSpeciesExtras(pokemon) {
   try {
     species = await fetchJSON(pokemon.species.url);
   } catch {
-    return { region: variant, origin: "", evolution: null };
+    return { region: variant, origin: "", category: "", evolution: null };
   }
+
+  const category = speciesCategory(species);
 
   // Where the species started out, which is a different place from the variant's
   // region for the likes of Alolan Raichu — a Kanto species, an Alolan Pokémon.
@@ -649,10 +656,18 @@ async function loadSpeciesExtras(pokemon) {
 
   try {
     const chain = await fetchJSON(species.evolution_chain.url);
-    return { region, origin, evolution: toStages(chain.chain) };
+    return { region, origin, category, evolution: toStages(chain.chain) };
   } catch {
-    return { region, origin, evolution: null };
+    return { region, origin, category, evolution: null };
   }
+}
+
+// PokéAPI calls the category a "genus", and carries one per language. The
+// English ones already read the way the games print them — "Mouse Pokémon" —
+// so they need no tidying up, only picking out.
+function speciesCategory(species) {
+  const entry = (species.genera || []).find((g) => g.language.name === "en");
+  return entry ? entry.genus : "";
 }
 
 function variantRegion(name) {
@@ -817,7 +832,7 @@ function shortEffect(move) {
   return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
 }
 
-function render(pokemon, moves, { region, origin, evolution }) {
+function render(pokemon, moves, { region, origin, category, evolution }) {
   const sprite =
     pokemon.sprites.other?.["official-artwork"]?.front_default ||
     pokemon.sprites.front_default;
@@ -834,6 +849,7 @@ function render(pokemon, moves, { region, origin, evolution }) {
           ${region ? `<span class="region">· ${escapeHTML(region)} region</span>` : ""}
           ${origin ? `<span class="region">· originally ${escapeHTML(origin)}</span>` : ""}
         </div>
+        ${category ? `<div class="category">${escapeHTML(category)}</div>` : ""}
         <div class="types">${pokemon.types.map((t) => typePill(t.type.name)).join("")}</div>
       </div>
     </div>
