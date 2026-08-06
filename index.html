@@ -12,6 +12,16 @@
     --muted: #6b6f76;
     --line: #e2e4e8;
     --accent: #d94b4b;
+    /* Gold for legendary, violet for mythical. Each has a line colour for the
+       edge and the label, a wash for the top of the card, and a glow around it. */
+    /* Deeper than the gold of the wash: the badge label is small bold text on
+       top of two coats of that wash, and a brighter gold doesn't clear 4.5:1. */
+    --legendary: #755c0f;
+    --legendary-wash: rgba(212, 175, 55, 0.20);
+    --legendary-glow: rgba(212, 175, 55, 0.30);
+    --mythical: #7a3d9c;
+    --mythical-wash: rgba(160, 90, 190, 0.16);
+    --mythical-glow: rgba(160, 90, 190, 0.28);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -21,6 +31,14 @@
       --muted: #9aa0a8;
       --line: #2e323a;
       --accent: #e56b6b;
+      /* Both colours lift and the washes drop, so they read on a dark card
+         without glowing hard enough to bury the text on top of them. */
+      --legendary: #e9c85c;
+      --legendary-wash: rgba(212, 175, 55, 0.14);
+      --legendary-glow: rgba(212, 175, 55, 0.22);
+      --mythical: #cf9ae8;
+      --mythical-wash: rgba(180, 120, 220, 0.14);
+      --mythical-glow: rgba(180, 120, 220, 0.22);
     }
   }
   * { box-sizing: border-box; }
@@ -81,10 +99,72 @@
     border-radius: 0.75rem;
     padding: 1.25rem;
   }
+  /* A legendary or mythical Pokémon dresses the whole card rather than just
+     wearing a label: a coloured edge, a wash of that colour fading out down the
+     card, and a soft glow around it. The two only differ by colour, so each
+     class just sets the three variables the shared rule below reads. */
+  .card.legendary {
+    --rare: var(--legendary);
+    --rare-wash: var(--legendary-wash);
+    --rare-glow: var(--legendary-glow);
+  }
+  .card.mythical {
+    --rare: var(--mythical);
+    --rare-wash: var(--mythical-wash);
+    --rare-glow: var(--mythical-glow);
+  }
+  .card.legendary, .card.mythical {
+    border-color: var(--rare);
+    /* The wash covers the head and fades into the ordinary card colour before
+       the move tables, so it frames the Pokémon without tinting the data. */
+    background: linear-gradient(var(--rare-wash), var(--card) 9rem);
+    box-shadow: 0 0 1.5rem var(--rare-glow);
+  }
+
   .head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .head img { width: 96px; height: 96px; image-rendering: pixelated; }
   .head h2 { margin: 0; font-size: 1.35rem; text-transform: capitalize; }
   .dex { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* The badge sits beside the name rather than under it, and wraps below on a
+     narrow phone instead of squashing the name. */
+  .name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .rarity {
+    position: relative;
+    overflow: hidden;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--rare);
+    border-radius: 999px;
+    background: var(--rare-wash);
+    color: var(--rare);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .rarity-mark { margin-right: 0.3rem; }
+
+  /* A slow sheen across the badge — enough to catch the eye on the handful of
+     Pokémon that earn it. currentColor keeps it in whichever colour the badge
+     already is, so gold shimmers gold and violet shimmers violet. */
+  @media (prefers-reduced-motion: no-preference) {
+    .rarity::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 42%, currentColor 50%, transparent 58%);
+      opacity: 0.35;
+      transform: translateX(-100%);
+      animation: sheen 4.5s ease-in-out infinite;
+    }
+    @keyframes sheen {
+      /* Most of the cycle is spent waiting off-screen, so it reads as an
+         occasional glint rather than a constant sweep. */
+      0%, 60% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+  }
 
   .types { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
   .type {
@@ -641,10 +721,11 @@ async function loadSpeciesExtras(pokemon) {
   try {
     species = await fetchJSON(pokemon.species.url);
   } catch {
-    return { region: variant, origin: "", category: "", evolution: null };
+    return { region: variant, origin: "", category: "", rarity: "", evolution: null };
   }
 
   const category = speciesCategory(species);
+  const rarity = speciesRarity(species);
 
   // Where the species started out, which is a different place from the variant's
   // region for the likes of Alolan Raichu — a Kanto species, an Alolan Pokémon.
@@ -656,10 +737,19 @@ async function loadSpeciesExtras(pokemon) {
 
   try {
     const chain = await fetchJSON(species.evolution_chain.url);
-    return { region, origin, category, evolution: toStages(chain.chain) };
+    return { region, origin, category, rarity, evolution: toStages(chain.chain) };
   } catch {
-    return { region, origin, category, evolution: null };
+    return { region, origin, category, rarity, evolution: null };
   }
+}
+
+// Legendary and mythical are two separate flags on the species, and no species
+// carries both, so a card only ever has one of the two treatments to wear.
+// Mythical is checked first anyway, being the rarer of the two.
+function speciesRarity(species) {
+  if (species.is_mythical) return "mythical";
+  if (species.is_legendary) return "legendary";
+  return "";
 }
 
 // PokéAPI calls the category a "genus", and carries one per language. The
@@ -832,18 +922,21 @@ function shortEffect(move) {
   return entry.short_effect.replace(/\$effect_chance/g, move.effect_chance);
 }
 
-function render(pokemon, moves, { region, origin, category, evolution }) {
+function render(pokemon, moves, { region, origin, category, rarity, evolution }) {
   const sprite =
     pokemon.sprites.other?.["official-artwork"]?.front_default ||
     pokemon.sprites.front_default;
 
   const card = document.createElement("div");
-  card.className = "card";
+  card.className = rarity ? `card ${rarity}` : "card";
   card.innerHTML = `
     <div class="head">
       ${sprite ? `<img src="${sprite}" alt="${pokemon.name}">` : ""}
       <div>
-        <h2>${pokemon.name.replace(/-/g, " ")}</h2>
+        <div class="name-row">
+          <h2>${pokemon.name.replace(/-/g, " ")}</h2>
+          ${rarityBadge(rarity)}
+        </div>
         <div class="dex">
           #${String(pokemon.id).padStart(4, "0")}
           ${region ? `<span class="region">· ${escapeHTML(region)} region</span>` : ""}
@@ -921,6 +1014,17 @@ function moveTable(moves) {
     <thead><tr><th>Move</th><th>Type</th><th>Power</th><th>Acc.</th><th>PP</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
+}
+
+// A star apiece, different enough to tell the two apart at a glance. They are
+// decoration on top of a word that already says it, so screen readers skip them.
+const RARITY_MARKS = { legendary: "✦", mythical: "✧" };
+
+function rarityBadge(rarity) {
+  if (!rarity) return "";
+  return `<span class="rarity"
+    ><span class="rarity-mark" aria-hidden="true">${RARITY_MARKS[rarity]}</span
+    >${escapeHTML(rarity)}</span>`;
 }
 
 function typePill(name) {

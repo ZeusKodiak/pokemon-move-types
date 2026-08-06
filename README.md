@@ -7,6 +7,7 @@ or Dex number) and it shows
 
 - the region it comes from,
 - its category — the "Mouse Pokémon" line the games print,
+- whether it is legendary or mythical, which dresses the whole card,
 - the Pokémon's own type(s),
 - its evolution line, and what triggers each evolution,
 - its attacking moves — the highest-power moves it can learn,
@@ -160,6 +161,35 @@ an empty one.
 Category follows the species, not the form, which is what you want: Alolan
 Raichu is a Mouse Pokémon like every other Raichu, even though its region line
 says Alola.
+
+## Legendary and mythical
+
+The rare ones look rare. A legendary Pokémon's card turns gold — a gold edge, a
+wash of gold fading down from the top, a soft glow around it, and a ✦ Legendary
+badge beside the name. A mythical one does the same in violet, with ✧ Mythical.
+Everything else looks exactly as it did.
+
+The badge carries a slow sheen across it, once every few seconds rather than
+constantly, so it glints instead of flashing. A phone set to reduce motion gets
+the badge without the animation.
+
+These are two separate flags on the species record — `is_legendary` and
+`is_mythical` — so like the category they cost no extra request. 71 species are
+legendary and 23 are mythical, and nothing in PokéAPI's data is both, so a card
+never has to choose between the two treatments.
+
+The split is roughly "hard to get" versus "impossible to get normally": the
+legendaries are the ones standing at the end of a game (Mewtwo, Lugia, Rayquaza),
+while the mythicals are the event-only two dozen — Mew, Celebi, Arceus and the
+rest — that needed a download or a ticket to obtain.
+
+This is deliberately not the same thing as *rarity*. PokéAPI has no rarity
+field, and the closest alternatives are all worse for the job: `capture_rate`
+measures how hard something is to catch rather than how scarce it is, and the
+`habitat` field — which does have a value literally called `rare` — is only
+filled in for generations I to III, so anything from Sinnoh onwards has none.
+The two flags are complete across all 1,025 species, which is why they are what
+the card uses.
 
 ## Regions
 
