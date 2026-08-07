@@ -7,7 +7,8 @@ or Dex number) and it shows
 
 - the region it comes from,
 - its category — the "Mouse Pokémon" line the games print,
-- whether it is legendary or mythical, which dresses the whole card,
+- whether it is out of the ordinary — legendary, mythical, an Ultra Beast or a
+  Paradox Pokémon — which dresses the whole card,
 - the Pokémon's own type(s),
 - its evolution line, and what triggers each evolution,
 - its attacking moves — the highest-power moves it can learn,
@@ -190,6 +191,49 @@ measures how hard something is to catch rather than how scarce it is, and the
 filled in for generations I to III, so anything from Sinnoh onwards has none.
 The two flags are complete across all 1,025 species, which is why they are what
 the card uses.
+
+## Ultra Beasts and Paradox Pokémon
+
+Three more groups get the same treatment in their own colours: cyan for the
+eleven **Ultra Beasts**, after the wormhole they come through, and the two
+halves of the **Paradox** pairs split warm and cool — rust for the ten ancient
+ones, a cold steel for the ten machines. The badges read ◈ Ultra Beast,
+✸ Ancient Paradox and ⬡ Future Paradox.
+
+The Paradox pairs are split rather than lumped together because the games split
+them: Flutter Mane and Iron Moth are the same Pokémon reimagined in opposite
+directions, and one badge covering both would read oddly to anyone who has
+played. Nothing extra is needed to tell them apart — see below.
+
+### How they are found without a list of names
+
+PokéAPI records neither idea. There is no `is_paradox` or `is_ultra_beast`, and
+the only species flags are legendary, mythical and baby. The obvious fix would
+be to hard-code thirty-one names, the way the seven Hisui species are hard-coded
+further down — but it isn't needed, because each group has a signature ability
+that nothing outside the group has:
+
+| Ability | Marks | Holders |
+| --- | --- | --- |
+| Beast Boost | Ultra Beast | all 11, and nothing else |
+| Protosynthesis | Ancient Paradox | all 10, and nothing else |
+| Quark Drive | Future Paradox | all 10, and nothing else |
+
+That was checked against PokéAPI's own data rather than assumed: no strays, none
+missing. So the ability *is* the group. Abilities are on the Pokémon record the
+app already fetches, so this costs no extra request either — and unlike a list
+of names, it needs no maintenance when a new game adds more of them.
+
+It also survives a failure the flags don't: the abilities arrive with the
+Pokémon itself rather than with the species, so an Ultra Beast still shows as
+one even when the species request fails and the region and category go missing.
+
+**Koraidon and Miraidon** are the exception. They are Paradox Pokémon in the
+story, but each carries its own one-off ability instead of the shared two, so
+this test doesn't catch them. They are both flagged legendary, and a species
+flag deliberately outranks an ability, so they stay gold — being the legendary a
+whole game is built around is the more useful thing to say about them than which
+end of time they came from.
 
 ## Regions
 

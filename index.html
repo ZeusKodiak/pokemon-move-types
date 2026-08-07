@@ -22,6 +22,18 @@
     --mythical: #7a3d9c;
     --mythical-wash: rgba(160, 90, 190, 0.16);
     --mythical-glow: rgba(160, 90, 190, 0.28);
+    /* Cyan for the Ultra Beasts, after the wormhole they come through. The two
+       halves of the Paradox pairs split warm and cool: rust for the ancient
+       ones, a cold steel for the machines. */
+    --ultra-beast: #0a6570;
+    --ultra-beast-wash: rgba(0, 180, 200, 0.18);
+    --ultra-beast-glow: rgba(0, 180, 200, 0.28);
+    --ancient: #8a3f15;
+    --ancient-wash: rgba(194, 98, 42, 0.18);
+    --ancient-glow: rgba(194, 98, 42, 0.28);
+    --future: #43566d;
+    --future-wash: rgba(119, 150, 184, 0.18);
+    --future-glow: rgba(119, 150, 184, 0.28);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -39,6 +51,15 @@
       --mythical: #cf9ae8;
       --mythical-wash: rgba(180, 120, 220, 0.14);
       --mythical-glow: rgba(180, 120, 220, 0.22);
+      --ultra-beast: #5fd8e6;
+      --ultra-beast-wash: rgba(0, 180, 200, 0.14);
+      --ultra-beast-glow: rgba(0, 180, 200, 0.22);
+      --ancient: #eda875;
+      --ancient-wash: rgba(194, 98, 42, 0.14);
+      --ancient-glow: rgba(194, 98, 42, 0.22);
+      --future: #adc6e2;
+      --future-wash: rgba(119, 150, 184, 0.14);
+      --future-glow: rgba(119, 150, 184, 0.22);
     }
   }
   * { box-sizing: border-box; }
@@ -99,21 +120,18 @@
     border-radius: 0.75rem;
     padding: 1.25rem;
   }
-  /* A legendary or mythical Pokémon dresses the whole card rather than just
+  /* A Pokémon out of the ordinary dresses the whole card rather than just
      wearing a label: a coloured edge, a wash of that colour fading out down the
-     card, and a soft glow around it. The two only differ by colour, so each
-     class just sets the three variables the shared rule below reads. */
-  .card.legendary {
-    --rare: var(--legendary);
-    --rare-wash: var(--legendary-wash);
-    --rare-glow: var(--legendary-glow);
-  }
-  .card.mythical {
-    --rare: var(--mythical);
-    --rare-wash: var(--mythical-wash);
-    --rare-glow: var(--mythical-glow);
-  }
-  .card.legendary, .card.mythical {
+     card, and a soft glow around it. Every kind is the same treatment in a
+     different colour, so each class only names its three colours and the shared
+     rule does the work. */
+  .card.legendary { --rare: var(--legendary); --rare-wash: var(--legendary-wash); --rare-glow: var(--legendary-glow); }
+  .card.mythical { --rare: var(--mythical); --rare-wash: var(--mythical-wash); --rare-glow: var(--mythical-glow); }
+  .card.ultra-beast { --rare: var(--ultra-beast); --rare-wash: var(--ultra-beast-wash); --rare-glow: var(--ultra-beast-glow); }
+  .card.ancient { --rare: var(--ancient); --rare-wash: var(--ancient-wash); --rare-glow: var(--ancient-glow); }
+  .card.future { --rare: var(--future); --rare-wash: var(--future-wash); --rare-glow: var(--future-glow); }
+
+  .card.rare {
     border-color: var(--rare);
     /* The wash covers the head and fades into the ordinary card colour before
        the move tables, so it frames the Pokémon without tinting the data. */
@@ -714,18 +732,23 @@ async function lookup(rawQuery) {
 // than throwing.
 async function loadSpeciesExtras(pokemon) {
   // A regional variant's own region is in its name, so it survives even if the
-  // species request below fails.
+  // species request below fails. So does the Ultra Beast and Paradox marking,
+  // which reads the Pokémon's own abilities rather than anything on the species.
   const variant = variantRegion(pokemon.name);
+  const byAbility = rarityFromAbilities(pokemon);
 
   let species;
   try {
     species = await fetchJSON(pokemon.species.url);
   } catch {
-    return { region: variant, origin: "", category: "", rarity: "", evolution: null };
+    return { region: variant, origin: "", category: "", rarity: byAbility, evolution: null };
   }
 
   const category = speciesCategory(species);
-  const rarity = speciesRarity(species);
+  // A species flag outranks an ability: Koraidon and Miraidon are Paradox
+  // Pokémon carrying their own one-off abilities rather than the shared two, and
+  // being the legendary a game is built around is the more useful thing to say.
+  const rarity = speciesRarity(species) || byAbility;
 
   // Where the species started out, which is a different place from the variant's
   // region for the likes of Alolan Raichu — a Kanto species, an Alolan Pokémon.
@@ -749,6 +772,26 @@ async function loadSpeciesExtras(pokemon) {
 function speciesRarity(species) {
   if (species.is_mythical) return "mythical";
   if (species.is_legendary) return "legendary";
+  return "";
+}
+
+// Ultra Beasts and Paradox Pokémon have no flag of their own — PokéAPI records
+// neither idea. What each group does have is a signature ability that nothing
+// outside the group carries: all eleven Ultra Beasts have Beast Boost, the ten
+// ancient Paradox Pokémon have Protosynthesis, and the ten machine ones have
+// Quark Drive. So the ability identifies the group exactly, with no list of
+// names to keep up to date, and it comes off the Pokémon record already fetched.
+const ABILITY_RARITY = {
+  "beast-boost": "ultra-beast",
+  "protosynthesis": "ancient",
+  "quark-drive": "future",
+};
+
+function rarityFromAbilities(pokemon) {
+  for (const entry of pokemon.abilities || []) {
+    const match = ABILITY_RARITY[entry.ability?.name];
+    if (match) return match;
+  }
   return "";
 }
 
@@ -928,7 +971,8 @@ function render(pokemon, moves, { region, origin, category, rarity, evolution })
     pokemon.sprites.front_default;
 
   const card = document.createElement("div");
-  card.className = rarity ? `card ${rarity}` : "card";
+  // `rare` carries the treatment, the kind names the colours it uses.
+  card.className = RARITY[rarity] ? `card rare ${rarity}` : "card";
   card.innerHTML = `
     <div class="head">
       ${sprite ? `<img src="${sprite}" alt="${pokemon.name}">` : ""}
@@ -1016,15 +1060,24 @@ function moveTable(moves) {
   </table></div>`;
 }
 
-// A star apiece, different enough to tell the two apart at a glance. They are
-// decoration on top of a word that already says it, so screen readers skip them.
-const RARITY_MARKS = { legendary: "✦", mythical: "✧" };
+// A mark apiece, different enough to tell them apart at a glance: two stars for
+// the two kinds of rare, a facet for the Ultra Beasts, a sun for the ancient
+// Paradox ones and a bolt for the machines. They are decoration on top of a
+// label that already says it, so screen readers skip them.
+const RARITY = {
+  legendary: { mark: "✦", label: "Legendary" },
+  mythical: { mark: "✧", label: "Mythical" },
+  "ultra-beast": { mark: "◈", label: "Ultra Beast" },
+  ancient: { mark: "✸", label: "Ancient Paradox" },
+  future: { mark: "⬡", label: "Future Paradox" },
+};
 
 function rarityBadge(rarity) {
-  if (!rarity) return "";
+  const kind = RARITY[rarity];
+  if (!kind) return "";
   return `<span class="rarity"
-    ><span class="rarity-mark" aria-hidden="true">${RARITY_MARKS[rarity]}</span
-    >${escapeHTML(rarity)}</span>`;
+    ><span class="rarity-mark" aria-hidden="true">${kind.mark}</span
+    >${escapeHTML(kind.label)}</span>`;
 }
 
 function typePill(name) {
