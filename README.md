@@ -104,6 +104,17 @@ so fire + flying gives you Charizard and Moltres rather than every fire Pokémon
 plus every flying one. Combinations nothing has, like fire + water, come back
 empty.
 
+**Only one type** is the tick box next to the heading. It hides every Pokémon
+that has a second type, so fire on its own gives you Charmander and Growlithe
+but not Charizard, who is also flying. Ticked with no type chosen, it lists every
+one-type Pokémon there is.
+
+While it is ticked the pills work one at a time: tapping a second type swaps to
+it rather than adding it, because asking for something that is purely fire *and*
+purely water could only ever come back empty. Tapping the lit pill again turns it
+off. If two types were already chosen when the box is ticked, the first one
+stays.
+
 Typing in the search box works alongside the type filter, and both apply at
 once: with fire selected, `char` gives just the Charmander line. The count above
 the list names whichever filters are in play, so an empty list never looks like
@@ -113,6 +124,14 @@ Type membership comes from PokéAPI's `/type` endpoint — one request per type,
 which is why the list flickers to "Loading type list…" the first time a pill is
 used. Each type is cached for the rest of the session, so switching back is
 instant.
+
+Nothing in that data says how many types a Pokémon has — being in the fire list
+doesn't rule out also being in the flying one — so "only one type" works it out
+by counting across all eighteen lists. Appearing in exactly one of them is what
+having one type means. That makes the first tick slower than a pill, since it
+needs all eighteen rather than one, and it says "Checking which Pokémon have one
+type…" while it does. After that they are cached like any other, shared with both
+the pills and the matchups tab, and the answer is worked out once.
 
 ## Type matchups
 
