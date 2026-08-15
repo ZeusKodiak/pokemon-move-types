@@ -228,7 +228,28 @@
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
+    flex-wrap: wrap;
     margin-bottom: 0.5rem;
+  }
+  /* The general input rule above dresses text boxes — a tick box wants none of
+     its padding, its border, or its stretch-to-fill. */
+  .only-one {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .only-one input {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    accent-color: var(--accent);
   }
   .filter-head h2 { font-size: 0.8rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .filter-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -364,6 +385,10 @@
   <div class="filter">
     <div class="filter-head">
       <h2>Filter by type</h2>
+      <label class="only-one">
+        <input type="checkbox" id="onlyOneType">
+        Only one type
+      </label>
       <button type="button" id="clearTypes" class="clear" hidden>Clear</button>
     </div>
     <div id="typeButtons" class="filter-buttons"></div>
@@ -445,6 +470,7 @@ const pickerEl = document.getElementById("picker");
 const pickerCountEl = document.getElementById("pickerCount");
 const typeButtonsEl = document.getElementById("typeButtons");
 const clearTypesButton = document.getElementById("clearTypes");
+const onlyOneTypeBox = document.getElementById("onlyOneType");
 const tabsEl = document.querySelector(".tabs");
 const panels = {
   dex: document.getElementById("dexPanel"),
@@ -463,6 +489,9 @@ let allPokemon = [];
 // Which type buttons are switched on, and one cached membership list per type.
 const activeTypes = new Set();
 const typeCache = new Map();
+
+// Whether the list is limited to Pokémon with exactly one type.
+let onlyOneType = false;
 
 // Names allowed through by the type filter, or null when no type is selected.
 // Rebuilt whenever the selection changes, so name filtering stays synchronous.
@@ -521,8 +550,24 @@ typeButtonsEl.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-type]");
   if (!button) return;
   const type = button.dataset.type;
-  if (activeTypes.has(type)) activeTypes.delete(type);
+  const wasOn = activeTypes.has(type);
+  // "Only one type" allows one at a time: asking for a Pokémon that is purely
+  // fire and purely water at once can only ever come back empty, so a tap
+  // replaces the selection there rather than adding to it.
+  if (onlyOneType) activeTypes.clear();
+  if (wasOn) activeTypes.delete(type);
   else activeTypes.add(type);
+  applyTypeFilter();
+});
+
+onlyOneTypeBox.addEventListener("change", () => {
+  onlyOneType = onlyOneTypeBox.checked;
+  // Switching it on with several types already chosen keeps the first.
+  if (onlyOneType && activeTypes.size > 1) {
+    const first = [...activeTypes][0];
+    activeTypes.clear();
+    activeTypes.add(first);
+  }
   applyTypeFilter();
 });
 
@@ -532,6 +577,8 @@ typeButtonsEl.addEventListener("click", (event) => {
 // cover the list the tap was meant to reveal.
 clearTypesButton.addEventListener("click", () => {
   activeTypes.clear();
+  onlyOneType = false;
+  onlyOneTypeBox.checked = false;
   queryInput.value = "";
   applyTypeFilter();
 });
@@ -575,7 +622,7 @@ function renderTypeButtons() {
 // Clear covers the search box as well as the types, so it has to be reachable
 // whenever either of them is narrowing the list — not just when a type is on.
 function updateClearButton() {
-  clearTypesButton.hidden = !activeTypes.size && !queryInput.value.trim();
+  clearTypesButton.hidden = !activeTypes.size && !onlyOneType && !queryInput.value.trim();
 }
 
 // One request per type, serving both the filter below and the matchups tab: the
@@ -604,25 +651,65 @@ async function loadType(type) {
   return new Set(data.pokemon.map((entry) => entry.pokemon.name));
 }
 
+// How many types a Pokémon has is only on its own record, and the type lists
+// don't say — being in the fire list doesn't rule out also being in the flying
+// one. So count across all eighteen lists: appearing in exactly one of them is
+// what having one type means. That is eighteen requests the first time, but they
+// are the same cached lists the filter and the matchups tab already use, so most
+// of them are usually paid for already, and the answer never changes.
+let oneTypeNames = null;
+
+function loadOneTypeNames() {
+  if (!oneTypeNames) {
+    oneTypeNames = Promise.all(Object.keys(TYPE_COLOURS).map(loadType))
+      .then((sets) => {
+        const counts = new Map();
+        for (const set of sets) {
+          for (const name of set) counts.set(name, (counts.get(name) || 0) + 1);
+        }
+        return new Set([...counts].filter(([, n]) => n === 1).map(([name]) => name));
+      })
+      // Don't cache a failure, or a blip would wedge the tick box until reload.
+      .catch((error) => {
+        oneTypeNames = null;
+        throw error;
+      });
+  }
+  return oneTypeNames;
+}
+
 async function applyTypeFilter() {
   renderTypeButtons();
   const requestId = ++typeRequestId;
 
-  if (!activeTypes.size) {
+  if (!activeTypes.size && !onlyOneType) {
     typeMatches = null;
     renderPicker(queryInput.value);
     return;
   }
 
   const wanted = [...activeTypes];
-  pickerCountEl.textContent = "Loading type list…";
+  // The first use of the tick box has eighteen lists to gather rather than one,
+  // so it says what it is doing rather than looking stuck.
+  pickerCountEl.textContent = onlyOneType && !oneTypeNames
+    ? "Checking which Pokémon have one type…"
+    : "Loading type list…";
   try {
-    const sets = await Promise.all(wanted.map(loadType));
+    const [sets, singles] = await Promise.all([
+      Promise.all(wanted.map(loadType)),
+      onlyOneType ? loadOneTypeNames() : null,
+    ]);
     // A slower earlier request must not overwrite a newer selection.
     if (requestId !== typeRequestId) return;
     // Several types selected means "has all of these", so a dual-type search
     // like fire + flying lands on Charizard rather than every fire Pokémon.
-    typeMatches = sets.reduce((kept, set) => new Set([...kept].filter((name) => set.has(name))));
+    let kept = sets.length
+      ? sets.reduce((all, set) => new Set([...all].filter((name) => set.has(name))))
+      : null;
+    // The tick box then drops anything carrying a second type, and on its own —
+    // with no type chosen — it is the whole list of one-type Pokémon.
+    if (singles) kept = kept ? new Set([...kept].filter((name) => singles.has(name))) : singles;
+    typeMatches = kept;
     renderPicker(queryInput.value);
   } catch (error) {
     if (requestId !== typeRequestId) return;
@@ -668,7 +755,8 @@ function renderPicker(rawQuery) {
   // Say which filters are in play, so an empty list never looks like a bug.
   const parts = [];
   if (rawQuery.trim()) parts.push(`"${rawQuery.trim()}"`);
-  if (activeTypes.size) parts.push([...activeTypes].join(" + "));
+  if (onlyOneType) parts.push(activeTypes.size ? `${[...activeTypes][0]} only` : "one type only");
+  else if (activeTypes.size) parts.push([...activeTypes].join(" + "));
   const criteria = parts.join(" and ");
 
   if (!matches.length) {
