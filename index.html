@@ -102,6 +102,10 @@
     border: 1px solid var(--line);
   }
   input { flex: 1; min-width: 0; background: var(--card); color: var(--text); }
+  /* An example of what to type has to look like an example. Left at the browser's
+     own colour it comes out nearly as dark as a real answer, and an empty box
+     reads as one that is already filled in. */
+  ::placeholder { color: var(--muted); opacity: 1; }
   button {
     background: var(--accent);
     border-color: transparent;
@@ -141,6 +145,9 @@
 
   .head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .head img { width: 96px; height: 96px; image-rendering: pixelated; }
+  /* A photo off the camera is not a sprite: it wants smoothing, not the pixel
+     doubling that suits PokéAPI's artwork, and it won't be square. */
+  .head img.own, .evo-member img.own { image-rendering: auto; object-fit: contain; }
   .head h2 { margin: 0; font-size: 1.35rem; text-transform: capitalize; }
   .dex { color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -381,6 +388,162 @@
     font-variant-numeric: tabular-nums;
   }
   .matchup-none { color: var(--muted); font-size: 0.9rem; }
+
+  /* ---- Made-up Pokémon --------------------------------------------------- */
+
+  /* The "Sammy Styled" badge is the same pill as the rarity badges, but it
+     doesn't dress the card the way they do — a made-up Pokémon can be legendary
+     too, and then it wears both, the rarity colouring the card and this one just
+     saying where it came from. It stays red wherever it appears. */
+  .sammy {
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* In the list, the same idea shrunk to a dot: enough to pick Sammy's own out
+     of a thousand real ones while scrolling, without a word taking up the row. */
+  .picker .made-up { color: var(--accent); margin-right: 0.15rem; }
+
+  .maker-form { display: block; margin: 0; }
+  .field { margin-bottom: 1.1rem; }
+  .field > label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .field .hint { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0 0; }
+  .field input[type="text"], .field input[type="number"], .field select, .field textarea {
+    width: 100%;
+    font: inherit;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+  }
+  .field textarea { min-height: 4rem; resize: vertical; }
+
+  /* Number boxes for power/accuracy/PP sit three abreast rather than each taking
+     a full line, since they are all short. */
+  .field-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+  .field-row .field { flex: 1; min-width: 6rem; }
+
+  .picture-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .picture-row img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--bg);
+  }
+  /* The real file input is unusable on a phone and can't be styled, so it is
+     hidden behind a normal-looking button that clicks it. */
+  .picture-row input[type="file"] { display: none; }
+  .ghost {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .ghost:hover, .ghost:focus { border-color: var(--accent); color: var(--accent); }
+
+  /* The chosen moves, and the made-up Pokémon themselves, are both lists of
+     things with a remove button on the end. */
+  .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    text-transform: capitalize;
+  }
+  .chip button {
+    background: none;
+    border: 0;
+    padding: 0 0.2rem;
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .chip button:hover, .chip button:focus { color: var(--accent); }
+
+  .move-picker { border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.9rem; }
+  .move-picker .filter-buttons { margin-bottom: 0.7rem; }
+  .move-list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    max-height: 12rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+  }
+  .move-list li { border-bottom: 1px solid var(--line); }
+  .move-list li:last-child { border-bottom: 0; }
+  .move-list button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    color: var(--text);
+    font-weight: 400;
+    text-transform: capitalize;
+    padding: 0.6rem 0.8rem;
+  }
+  .move-list button:hover, .move-list button:focus { background: var(--line); }
+
+  /* Sections of the form that are folded away until wanted, so the page isn't a
+     wall of boxes on first sight. */
+  details.fold { border-top: 1px solid var(--line); padding: 0.9rem 0 0; margin-top: 0.9rem; }
+  details.fold > summary { cursor: pointer; font-weight: 600; margin-bottom: 0.9rem; }
+
+  .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1.5rem; }
+
+  .made-list { list-style: none; margin: 0; padding: 0; }
+  .made-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .made-list li:last-child { border-bottom: 0; }
+  .made-list img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 0.35rem;
+    background: var(--bg);
+  }
+  .made-list .who { flex: 1; min-width: 0; }
+  .made-list .who strong { text-transform: capitalize; }
+  .made-list .who .dex { display: block; font-size: 0.85rem; }
+  .made-list button { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
+
+  /* Sync state, shown on the making tab where it can be acted on. */
+  .syncline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: #3f9d54; }
+  .dot.busy { background: #d1a33a; }
+  .dot.bad { background: var(--accent); }
 </style>
 </head>
 <body>
@@ -390,6 +553,7 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" data-tab="dex" aria-selected="true" aria-controls="dexPanel">Pokémon</button>
     <button type="button" role="tab" data-tab="types" aria-selected="false" aria-controls="typesPanel">Type matchups</button>
+    <button type="button" role="tab" data-tab="make" aria-selected="false" aria-controls="makePanel">Make one</button>
   </div>
 
 <section id="dexPanel" role="tabpanel">
@@ -433,6 +597,185 @@
 
   <p id="matchupStatus" class="status"></p>
   <div id="matchup"></div>
+</section>
+
+<section id="makePanel" role="tabpanel" hidden>
+  <p class="tagline">Invent a Pokémon of your own. It gets a card like any other,
+    and turns up in the list on the first tab with a red <span class="made-up">●</span>
+    beside it.</p>
+
+  <div class="card">
+    <form id="makerForm" class="maker-form">
+      <div class="field">
+        <label for="makeName">Name</label>
+        <input type="text" id="makeName" autocomplete="off" autocapitalize="words"
+               spellcheck="false" placeholder="Sparkitty">
+      </div>
+
+      <div class="field">
+        <label for="makeCategory">Category</label>
+        <input type="text" id="makeCategory" autocomplete="off" placeholder="Firefly Pokémon">
+        <p class="hint">The line the games print under the name — Pikachu is the
+          Mouse Pokémon.</p>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="makeRegion">Region</label>
+          <select id="makeRegion"></select>
+        </div>
+        <div class="field">
+          <label for="makeRarity">Out of the ordinary?</label>
+          <select id="makeRarity"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Type <span class="hint" style="text-transform:none">— one or two</span></label>
+        <div id="makeTypeButtons" class="filter-buttons"></div>
+      </div>
+
+      <div class="field">
+        <label>Picture</label>
+        <div class="picture-row">
+          <img id="makePicturePreview" alt="" hidden>
+          <input type="file" id="makePicture" accept="image/*">
+          <button type="button" class="ghost" id="makePictureBtn">Choose a picture</button>
+          <button type="button" class="ghost" id="makePictureClear" hidden>Remove</button>
+        </div>
+        <p class="hint">Taken from this device and shrunk to fit on the card, so a
+          photo straight from the camera is fine.</p>
+      </div>
+
+      <div class="field">
+        <label>Moves <span class="hint" style="text-transform:none">— up to <span id="moveMax">12</span></span></label>
+        <div id="makeMoveChips" class="chips"></div>
+        <div class="move-picker">
+          <div id="moveTypeButtons" class="filter-buttons"></div>
+          <input type="text" id="moveSearch" placeholder="Search that type's moves" autocomplete="off"
+                 autocapitalize="off" spellcheck="false">
+          <p id="moveStatus" class="status"></p>
+          <ul id="moveList" class="move-list"></ul>
+
+          <details class="fold" id="ownMoveFold">
+            <summary>Or write a move of your own</summary>
+            <div class="field">
+              <label for="ownMoveName">Move name</label>
+              <input type="text" id="ownMoveName" autocomplete="off" placeholder="Ember Waltz">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ownMoveType">Type</label>
+                <select id="ownMoveType"></select>
+              </div>
+              <div class="field">
+                <label for="ownMoveClass">Kind</label>
+                <select id="ownMoveClass">
+                  <option value="physical">Physical</option>
+                  <option value="special">Special</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ownMovePower">Power</label>
+                <input type="number" id="ownMovePower" min="0" max="300" placeholder="80">
+              </div>
+              <div class="field">
+                <label for="ownMoveAccuracy">Accuracy %</label>
+                <input type="number" id="ownMoveAccuracy" min="0" max="100" placeholder="100">
+              </div>
+              <div class="field">
+                <label for="ownMovePP">PP</label>
+                <input type="number" id="ownMovePP" min="1" max="64" placeholder="15">
+              </div>
+            </div>
+            <div class="field">
+              <label for="ownMoveEffect">What it does</label>
+              <input type="text" id="ownMoveEffect" autocomplete="off"
+                     placeholder="Lowers the target's speed.">
+              <p class="hint">Only needed for a status move, which has nothing else
+                to show.</p>
+            </div>
+            <button type="button" class="ghost" id="addOwnMove">Add this move</button>
+          </details>
+        </div>
+      </div>
+
+      <details class="fold" id="evoFold">
+        <summary>Evolution</summary>
+        <div class="field">
+          <label for="evoFromName">Evolves from</label>
+          <input type="text" id="evoFromName" list="evoOptions" autocomplete="off"
+                 autocapitalize="off" spellcheck="false" placeholder="Any Pokémon, real or your own">
+        </div>
+        <div class="field">
+          <label for="evoFromHow">…by</label>
+          <input type="text" id="evoFromHow" autocomplete="off" placeholder="Level 25">
+        </div>
+        <div class="field">
+          <label for="evoToName">Evolves into</label>
+          <input type="text" id="evoToName" list="evoOptions" autocomplete="off"
+                 autocapitalize="off" spellcheck="false" placeholder="Any Pokémon, real or your own">
+        </div>
+        <div class="field">
+          <label for="evoToHow">…by</label>
+          <input type="text" id="evoToHow" autocomplete="off" placeholder="Use Fire Stone">
+        </div>
+        <datalist id="evoOptions"></datalist>
+      </details>
+
+      <p id="makeStatus" class="status"></p>
+      <div class="actions">
+        <button type="submit" id="makeSave">Save</button>
+        <button type="button" class="ghost" id="makeCancel" hidden>Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <h3>Your Pokémon</h3>
+  <div class="card">
+    <p id="madeEmpty" class="status">None yet — the first one you save shows up here.</p>
+    <ul id="madeList" class="made-list"></ul>
+  </div>
+
+  <h3>Keeping them</h3>
+  <div class="card">
+    <div class="syncline">
+      <span class="dot" id="syncDot"></span>
+      <span id="syncText"></span>
+    </div>
+    <p id="syncDetail" class="status error" hidden></p>
+    <p id="syncWhere" class="hint"></p>
+    <div class="actions" id="syncButtons">
+      <button type="button" id="syncNow" hidden>Sync now</button>
+      <button type="button" class="ghost" id="setupBtn">Set up</button>
+    </div>
+
+    <form class="maker-form" id="setupForm" hidden>
+      <div class="field">
+        <label for="repoInput">Repository</label>
+        <input type="text" id="repoInput" placeholder="owner/repo" autocapitalize="none"
+               autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="tokenInput">Token</label>
+        <input type="text" id="tokenInput" placeholder="github_pat_…" autocomplete="off"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               style="-webkit-text-security:disc">
+        <p class="hint">A fine-grained token with <strong>Contents: read and
+          write</strong> on that one repository. It stays in this browser — it is
+          never uploaded and never part of a downloaded copy. Anyone who can unlock
+          this device can read it, so keep it to that one repository.</p>
+      </div>
+      <div class="actions">
+        <button type="submit">Save and sync</button>
+        <button type="button" class="ghost" id="cancelConf">Cancel</button>
+        <button type="button" class="ghost" id="disconnect" hidden>Disconnect</button>
+      </div>
+    </form>
+  </div>
 </section>
 </main>
 
@@ -535,7 +878,9 @@ const tabsEl = document.querySelector(".tabs");
 const panels = {
   dex: document.getElementById("dexPanel"),
   types: document.getElementById("typesPanel"),
+  make: document.getElementById("makePanel"),
 };
+const $ = (id) => document.getElementById(id);
 const matchupButtonsEl = document.getElementById("matchupButtons");
 const matchupStatusEl = document.getElementById("matchupStatus");
 const matchupEl = document.getElementById("matchup");
@@ -673,6 +1018,8 @@ async function loadPokemonList() {
     id: Number(entry.url.replace(/\/$/, "").split("/").pop()),
   }));
   renderPicker(queryInput.value);
+  // The evolution boxes offer real names too, so they wait on this list.
+  renderEvoOptions();
 }
 
 function renderTypeButtons() {
@@ -783,8 +1130,32 @@ async function applyTypeFilter() {
   }
 }
 
+// The list is everything PokéAPI knows about plus everything Sammy has made up,
+// in dex order. Made-up ones are numbered from 9001 so they land at the end and
+// can never collide with a real number, however many more get added.
+function pokemonPool() {
+  return allPokemon.concat(
+    made.map((entry) => ({
+      name: entry.slug,
+      display: entry.name,
+      id: entry.dex,
+      types: entry.types,
+      made: true,
+    }))
+  );
+}
+
+// The type filter's answers come from PokéAPI, which has never heard of a made-up
+// Pokémon, so those are matched against their own types here instead.
+function matchesTypeFilter(p) {
+  if (!typeMatches && !onlyOneType) return true;
+  if (!p.made) return typeMatches ? typeMatches.has(p.name) : true;
+  if (onlyOneType && p.types.length !== 1) return false;
+  return [...activeTypes].every((type) => p.types.includes(type));
+}
+
 function filterPokemon(rawQuery) {
-  const pool = typeMatches ? allPokemon.filter((p) => typeMatches.has(p.name)) : allPokemon;
+  const pool = pokemonPool().filter(matchesTypeFilter);
   const needle = rawQuery.trim().toLowerCase().replace(/[\s-]/g, "");
   if (!needle) return pool;
   const matches = pool.filter(
@@ -811,7 +1182,8 @@ function renderPicker(rawQuery) {
   pickerEl.innerHTML = shown
     .map(
       (p) => `<li><button type="button" data-name="${escapeHTML(p.name)}">
-        ${escapeHTML(p.name.replace(/-/g, " "))}
+        ${p.made ? '<span class="made-up" aria-label="Made up">●</span>' : ""}
+        ${escapeHTML(p.display || p.name.replace(/-/g, " "))}
         <span class="dexnum">#${String(p.id).padStart(4, "0")}</span>
       </button></li>`
     )
@@ -839,6 +1211,22 @@ function renderPicker(rawQuery) {
 async function lookup(rawQuery) {
   const name = rawQuery.trim().toLowerCase().replace(/\s+/g, "-");
   if (!name) return;
+
+  // One of Sammy's own is already in hand, so it draws straight away with no
+  // request. Bumping the id cancels any real lookup still in flight, which would
+  // otherwise land afterwards and replace this card with its own.
+  const own = madeBySlug(name);
+  if (own) {
+    lookupId++;
+    submitButton.disabled = false;
+    resultEl.innerHTML = "";
+    setStatus("");
+    renderMade(own);
+    currentPokemon = own.slug;
+    currentTypes = own.types;
+    updateHash();
+    return;
+  }
 
   // Picking from the list — or from the evolution line — isn't gated the way the
   // submit button is, so a second lookup can start while the first is still in
@@ -1230,8 +1618,12 @@ function evoStage(stage, current) {
   const members = stage.map((member) => `
     <button type="button" class="evo-member${member.name === current ? " current" : ""}"
             data-name="${escapeHTML(member.name)}">
-      <img src="${SPRITES}/${member.id}.png" alt="" loading="lazy">
-      <span class="evo-name">${escapeHTML(prettify(member.name))}</span>
+      ${member.img
+        ? `<img class="own" src="${escapeHTML(member.img)}" alt="">`
+        : member.id
+          ? `<img src="${SPRITES}/${member.id}.png" alt="" loading="lazy">`
+          : ""}
+      <span class="evo-name">${escapeHTML(member.display || prettify(member.name))}</span>
       ${member.how ? `<span class="evo-how">${escapeHTML(member.how)}</span>` : ""}
     </button>
   `).join("");
@@ -1307,6 +1699,857 @@ function typePillButton(name) {
     style="background:${colour}">${escapeHTML(name)}</button>`;
 }
 
+/* ---- Made-up Pokémon ----------------------------------------------------- */
+
+const MADE_STORE = "pokedex/made/v1";
+const CONF_STORE = "pokedex/github";
+
+// The most moves a card will hold. The real ones show twelve attacking moves, so
+// twelve is as many as a made-up one could ever need to fill the same tables.
+const MAX_MOVES = 12;
+
+// Real dex numbers stop a long way below this, so a made-up one can never
+// collide with a Pokémon that exists — or with one a future game adds.
+const MADE_DEX_START = 9001;
+
+// Pictures are stored inside the record, so they are shrunk to this before being
+// kept: a photo straight off a phone camera would fill the browser's storage on
+// its own, and nothing on the card is bigger than 96 pixels anyway.
+const PICTURE_MAX_PX = 240;
+
+// The regions the app already knows how to name.
+const MAKE_REGIONS = [...new Set([...Object.values(REGIONS), "Hisui"])];
+
+// Records live in this browser and are the working copy: saving is instant and
+// works with no signal. Syncing to GitHub happens afterwards, in the background.
+let made = [];
+let madeDeleted = [];
+loadMade();
+
+function readJSON(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(raw); }
+  catch (error) { console.warn("Couldn't read saved Pokémon:", error); return null; }
+}
+
+function loadMade() {
+  const data = readJSON(localStorage.getItem(MADE_STORE));
+  made = Array.isArray(data && data.made) ? data.made : [];
+  madeDeleted = Array.isArray(data && data.deleted) ? data.deleted : [];
+}
+
+function madeSnapshot() { return { version: 1, made, deleted: madeDeleted }; }
+
+function saveMade() {
+  try {
+    localStorage.setItem(MADE_STORE, JSON.stringify(madeSnapshot()));
+    return true;
+  } catch (error) {
+    setMakeStatus("Couldn't save — this browser is either blocking storage or " +
+      "full. Try a smaller picture.", true);
+    return false;
+  }
+}
+
+// Everything either side has seen, minus anything either side has deleted. Order
+// doesn't matter and doing it twice changes nothing, so two devices always land
+// on the same answer.
+function mergeMade(a, b) {
+  const gone = new Set([...(a.deleted || []), ...(b.deleted || [])]);
+  const byId = new Map();
+  for (const entry of [...(a.made || []), ...(b.made || [])]) {
+    if (!entry || !entry.id || gone.has(entry.id)) continue;
+    const seen = byId.get(entry.id);
+    // Edited on both devices since they last met: the later edit wins.
+    if (!seen || String(entry.edited || "") > String(seen.edited || "")) {
+      byId.set(entry.id, entry);
+    }
+  }
+  return {
+    version: 1,
+    made: [...byId.values()].sort((x, y) => x.dex - y.dex),
+    deleted: [...gone],
+  };
+}
+
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function madeBySlug(slug) { return made.find((entry) => entry.slug === slug); }
+
+function nextDex() {
+  return made.reduce((top, entry) => Math.max(top, entry.dex), MADE_DEX_START - 1) + 1;
+}
+
+function newId() {
+  return crypto.randomUUID
+    ? crypto.randomUUID()
+    : String(Date.now()) + Math.random().toString(16).slice(2);
+}
+
+// The same card a real Pokémon gets, built from what was typed in rather than
+// from PokéAPI — so a made-up one shows everything a real one does, and nothing
+// it doesn't. The "Sammy Styled" badge is on top of any rarity badge rather than
+// instead of it: a made-up Pokémon can be legendary too, and then the card is
+// dressed gold exactly like a real legendary.
+function renderMade(entry) {
+  const damaging = entry.moves
+    .filter((move) => move.damageClass !== "status" && move.power !== null && move.power !== undefined)
+    .sort((a, b) => b.power - a.power || a.name.localeCompare(b.name));
+  const status = entry.moves.filter((move) => move.damageClass === "status");
+
+  const card = document.createElement("div");
+  card.className = RARITY[entry.rarity] ? `card rare ${entry.rarity}` : "card";
+  card.innerHTML = `
+    <div class="head">
+      ${entry.picture
+        ? `<img class="own" src="${escapeHTML(entry.picture)}" alt="${escapeHTML(entry.name)}">`
+        : ""}
+      <div>
+        <div class="name-row">
+          <h2>${escapeHTML(entry.name)}</h2>
+          ${rarityBadge(entry.rarity)}
+          <span class="sammy">Sammy Styled</span>
+        </div>
+        <div class="dex">
+          #${String(entry.dex).padStart(4, "0")}
+          ${entry.region ? `<span class="region">· ${escapeHTML(entry.region)} region</span>` : ""}
+        </div>
+        ${entry.category ? `<div class="category">${escapeHTML(entry.category)}</div>` : ""}
+        <div class="types">${entry.types.map(typePill).join("")}</div>
+      </div>
+    </div>
+
+    ${madeEvolutionSection(entry)}
+
+    <h3>Attacking moves <span class="note">— highest-power moves it can learn</span></h3>
+    ${damaging.length
+      ? moveTable(damaging)
+      : "<p class='status'>No damaging moves given to this Pokémon.</p>"}
+
+    <h3>Status moves <span class="note">— non-damaging moves it can learn</span></h3>
+    ${status.length
+      ? moveTable(status)
+      : "<p class='status'>No status moves given to this Pokémon.</p>"}
+  `;
+  resultEl.appendChild(card);
+}
+
+// Reuses the real evolution line's markup, so a made-up Pokémon sits in a line
+// the same way — and every member of it is still tappable, whether it is one of
+// Sammy's or a real one.
+function madeEvolutionSection(entry) {
+  const heading = "<h3>Evolution line</h3>";
+  // A member's `how` says how you reach *it*, so the one before this Pokémon is
+  // the start of the line and carries nothing — its trigger belongs to this one.
+  const before = evoMember(entry.evolvesFrom, "");
+  const after = evoMember(entry.evolvesTo, entry.evolvesTo ? entry.evolvesTo.how : "");
+
+  // `how` on a member says how you reach that member, so this one carries
+  // whatever turns the Pokémon before it into this.
+  const self = {
+    name: entry.slug,
+    display: entry.name,
+    img: entry.picture,
+    how: before ? entry.evolvesFrom.how : "",
+  };
+
+  if (!before && !after) {
+    return `${heading}
+      <div class="evo">${evoStage([self], entry.slug)}</div>
+      <p class="status">This Pokémon doesn't evolve.</p>`;
+  }
+
+  const stages = [];
+  if (before) stages.push([before]);
+  stages.push([self]);
+  if (after) stages.push([after]);
+
+  const columns = stages
+    .map((stage) => evoStage(stage, entry.slug))
+    .join('<div class="evo-arrow">→</div>');
+  return `${heading}<div class="scroll"><div class="evo">${columns}</div></div>`;
+}
+
+// One end of an evolution link: either another of Sammy's, which brings its own
+// picture, or a real one, whose sprite is addressed by dex number like the rest
+// of the app. A name matching neither still shows, just without a picture.
+function evoMember(link, how) {
+  if (!link || !link.name) return null;
+  const own = madeBySlug(link.name);
+  if (own) {
+    return { name: own.slug, display: own.name, img: own.picture, how };
+  }
+  const real = allPokemon.find((p) => p.name === link.name);
+  return { name: link.name, display: prettify(link.name), id: real ? real.id : 0, how };
+}
+
+/* ---- Making one ---------------------------------------------------------- */
+
+const makerForm = $("makerForm");
+const makeTypeButtonsEl = $("makeTypeButtons");
+const moveTypeButtonsEl = $("moveTypeButtons");
+const moveListEl = $("moveList");
+const moveSearchEl = $("moveSearch");
+const moveChipsEl = $("makeMoveChips");
+const madeListEl = $("madeList");
+const makeStatusEl = $("makeStatus");
+const moveStatusEl = $("moveStatus");
+
+// What the form is holding right now, before it is saved.
+let makeTypes = [];
+let makeMoves = [];
+let makePicture = "";
+let editingId = "";
+
+// Which type's moves are listed, and a tag on the request so a slow reply for
+// one type can't land after a faster one for another.
+let moveType = "";
+let moveOptions = [];
+let moveRequestId = 0;
+
+function setMakeStatus(message, isError = false) {
+  makeStatusEl.textContent = message;
+  makeStatusEl.classList.toggle("error", isError);
+}
+function setMoveStatus(message, isError = false) {
+  moveStatusEl.textContent = message;
+  moveStatusEl.classList.toggle("error", isError);
+}
+
+function fillSelects() {
+  $("makeRegion").innerHTML = ['<option value="">No region</option>']
+    .concat(MAKE_REGIONS.map((r) => `<option value="${r}">${r}</option>`))
+    .join("");
+  // The same five kinds a real Pokémon can be, in the same words the badges use.
+  $("makeRarity").innerHTML = ['<option value="">Ordinary</option>']
+    .concat(Object.entries(RARITY).map(
+      ([key, kind]) => `<option value="${key}">${kind.label}</option>`))
+    .join("");
+  $("ownMoveType").innerHTML = Object.keys(TYPE_COLOURS)
+    .map((type) => `<option value="${type}">${type}</option>`)
+    .join("");
+  $("moveMax").textContent = String(MAX_MOVES);
+}
+
+// Two types is the most any Pokémon has, so a third tap is refused rather than
+// silently dropping one of the two already chosen.
+function renderMakeTypeButtons() {
+  makeTypeButtonsEl.innerHTML = Object.keys(TYPE_COLOURS)
+    .map((type) => `<button type="button" data-type="${type}"
+      aria-pressed="${makeTypes.includes(type)}"
+      style="background:${TYPE_COLOURS[type]}">${type}</button>`)
+    .join("");
+}
+
+function renderMoveTypeButtons() {
+  moveTypeButtonsEl.innerHTML = Object.keys(TYPE_COLOURS)
+    .map((type) => `<button type="button" data-type="${type}"
+      aria-pressed="${type === moveType}"
+      style="background:${TYPE_COLOURS[type]}">${type}</button>`)
+    .join("");
+}
+
+function renderMoveChips() {
+  moveChipsEl.innerHTML = makeMoves.length
+    ? makeMoves.map((move, i) => `<span class="chip">
+        ${typePill(move.type)}
+        ${escapeHTML(move.name.replace(/-/g, " "))}
+        <button type="button" data-remove-move="${i}" aria-label="Remove ${escapeHTML(move.name)}">×</button>
+      </span>`).join("")
+    : `<span class="status">No moves yet.</span>`;
+}
+
+function renderMoveList() {
+  if (!moveType) {
+    moveListEl.innerHTML = "";
+    setMoveStatus("Pick a type to see its moves.");
+    return;
+  }
+  const needle = moveSearchEl.value.trim().toLowerCase().replace(/[\s-]/g, "");
+  const matches = needle
+    ? moveOptions.filter((move) => move.name.replace(/-/g, "").includes(needle))
+    : moveOptions;
+  const shown = matches.slice(0, 60);
+
+  moveListEl.innerHTML = shown.map((move) => `<li>
+    <button type="button" data-move="${escapeHTML(move.name)}">
+      ${escapeHTML(move.name.replace(/-/g, " "))}
+    </button></li>`).join("");
+
+  if (!matches.length) setMoveStatus(`No ${moveType} move matches that.`);
+  else if (matches.length > shown.length) {
+    setMoveStatus(`Showing ${shown.length} of ${matches.length} — keep typing to narrow it down.`);
+  } else setMoveStatus("");
+}
+
+// The type record carries its whole move list, and it is the same request the
+// filter and the matchups tab already make, so a type looked at twice is free.
+async function showMoveType(type) {
+  moveType = type;
+  renderMoveTypeButtons();
+  const requestId = ++moveRequestId;
+  moveOptions = [];
+  moveListEl.innerHTML = "";
+  setMoveStatus(`Loading ${type} moves…`);
+  try {
+    const data = await loadTypeData(type);
+    if (requestId !== moveRequestId) return;
+    moveOptions = data.moves.slice().sort((a, b) => a.name.localeCompare(b.name));
+    renderMoveList();
+  } catch (error) {
+    if (requestId !== moveRequestId) return;
+    setMoveStatus(`Couldn't load the ${type} moves — try again.`, true);
+  }
+}
+
+function moveRoomLeft() {
+  if (makeMoves.length < MAX_MOVES) return true;
+  setMoveStatus(`That's ${MAX_MOVES} moves — as many as a card shows. ` +
+    `Remove one to add another.`, true);
+  return false;
+}
+
+// A real move brings its own power, accuracy, PP and effect, so the card can
+// show the same columns for it as for anything else.
+async function addRealMove(name) {
+  if (!moveRoomLeft()) return;
+  if (makeMoves.some((move) => move.name === name)) {
+    setMoveStatus("That one is already on the list.", true);
+    return;
+  }
+  const ref = moveOptions.find((move) => move.name === name);
+  if (!ref) return;
+  setMoveStatus("Loading that move…");
+  try {
+    const move = await loadMove(ref);
+    makeMoves.push(Object.assign({}, move));
+    setMoveStatus("");
+    renderMoveChips();
+  } catch (error) {
+    setMoveStatus("Couldn't load that move — try again.", true);
+  }
+}
+
+function addOwnMove() {
+  if (!moveRoomLeft()) return;
+  const name = $("ownMoveName").value.trim();
+  if (!name) { setMoveStatus("Give the move a name.", true); return; }
+  if (makeMoves.some((move) => move.name.toLowerCase() === name.toLowerCase())) {
+    setMoveStatus("There is already a move by that name on the list.", true);
+    return;
+  }
+
+  const damageClass = $("ownMoveClass").value;
+  const number = (id) => ($(id).value === "" ? null : Number($(id).value));
+  makeMoves.push({
+    name,
+    type: $("ownMoveType").value,
+    // A status move does no damage whatever was typed in the power box, which is
+    // what the card's dash in the power column means.
+    power: damageClass === "status" ? null : number("ownMovePower"),
+    accuracy: number("ownMoveAccuracy"),
+    pp: number("ownMovePP") === null ? 10 : number("ownMovePP"),
+    damageClass,
+    effect: $("ownMoveEffect").value.trim(),
+  });
+
+  for (const id of ["ownMoveName", "ownMovePower", "ownMoveAccuracy", "ownMovePP", "ownMoveEffect"]) {
+    $(id).value = "";
+  }
+  setMoveStatus("");
+  renderMoveChips();
+}
+
+// Shrunk before it is stored, because the record carries the picture itself
+// rather than a link to one — that is what lets it sync to another device and
+// still work with no signal. WebP keeps the transparency a cut-out drawing needs
+// at a fraction of PNG's size; a browser that can't write it gets a PNG back
+// from the canvas instead, which still works.
+function shrinkPicture(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("That file isn't a picture this browser can open."));
+      img.onload = () => {
+        const scale = Math.min(1, PICTURE_MAX_PX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/webp", 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function showPicture(dataURL) {
+  makePicture = dataURL;
+  const preview = $("makePicturePreview");
+  preview.src = dataURL || "";
+  preview.hidden = !dataURL;
+  $("makePictureClear").hidden = !dataURL;
+  $("makePictureBtn").textContent = dataURL ? "Change picture" : "Choose a picture";
+}
+
+// The evolution boxes take a name as typed — a real Pokémon's or one of Sammy's —
+// so match it the way the search box does before storing it.
+function evoLink(rawName, rawHow) {
+  const typed = rawName.trim();
+  if (!typed) return null;
+  const slug = slugify(typed);
+  const own = madeBySlug(slug);
+  const real = allPokemon.find((p) => p.name === slug);
+  return { name: own ? own.slug : real ? real.name : slug, how: rawHow.trim() };
+}
+
+function resetMakeForm() {
+  editingId = "";
+  makeTypes = [];
+  makeMoves = [];
+  for (const id of ["makeName", "makeCategory", "evoFromName", "evoFromHow", "evoToName", "evoToHow"]) {
+    $(id).value = "";
+  }
+  $("makeRegion").value = "";
+  $("makeRarity").value = "";
+  showPicture("");
+  renderMakeTypeButtons();
+  renderMoveChips();
+  $("makeSave").textContent = "Save";
+  $("makeCancel").hidden = true;
+  setMakeStatus("");
+}
+
+function editMade(id) {
+  const entry = made.find((e) => e.id === id);
+  if (!entry) return;
+  editingId = id;
+  $("makeName").value = entry.name;
+  $("makeCategory").value = entry.category || "";
+  $("makeRegion").value = entry.region || "";
+  $("makeRarity").value = entry.rarity || "";
+  makeTypes = [...entry.types];
+  makeMoves = entry.moves.map((move) => Object.assign({}, move));
+  showPicture(entry.picture || "");
+  $("evoFromName").value = entry.evolvesFrom ? entry.evolvesFrom.name : "";
+  $("evoFromHow").value = entry.evolvesFrom ? entry.evolvesFrom.how : "";
+  $("evoToName").value = entry.evolvesTo ? entry.evolvesTo.name : "";
+  $("evoToHow").value = entry.evolvesTo ? entry.evolvesTo.how : "";
+  renderMakeTypeButtons();
+  renderMoveChips();
+  $("makeSave").textContent = "Save changes";
+  $("makeCancel").hidden = false;
+  setMakeStatus(`Editing ${entry.name}.`);
+  makerForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deleteMade(id) {
+  const entry = made.find((e) => e.id === id);
+  if (!entry) return;
+  if (!confirm(`Delete ${entry.name}? This can't be undone.`)) return;
+  made = made.filter((e) => e.id !== id);
+  // Remember the removal. Without this, the next sync would see it still sitting
+  // in the repo and helpfully put it back.
+  if (!madeDeleted.includes(id)) madeDeleted.push(id);
+  saveMade();
+  queueSync();
+  if (editingId === id) resetMakeForm();
+  refreshMade();
+}
+
+function renderMadeList() {
+  madeListEl.innerHTML = made.map((entry) => `<li>
+    ${entry.picture
+      ? `<img src="${escapeHTML(entry.picture)}" alt="">`
+      : ""}
+    <span class="who">
+      <strong>${escapeHTML(entry.name)}</strong>
+      <span class="dex">#${String(entry.dex).padStart(4, "0")}${
+        entry.types.length ? " · " + escapeHTML(entry.types.join(" / ")) : ""}</span>
+    </span>
+    <button type="button" class="ghost" data-show="${escapeHTML(entry.slug)}">View</button>
+    <button type="button" class="ghost" data-edit="${escapeHTML(entry.id)}">Edit</button>
+    <button type="button" class="ghost" data-delete="${escapeHTML(entry.id)}">Delete</button>
+  </li>`).join("");
+  $("madeEmpty").hidden = made.length > 0;
+}
+
+// The evolution boxes offer every name there is, real or made up, so a line can
+// be joined onto without spelling anything from memory.
+function renderEvoOptions() {
+  $("evoOptions").innerHTML = pokemonPool()
+    .map((p) => `<option value="${escapeHTML(p.display || p.name)}"></option>`)
+    .join("");
+}
+
+// Everything that has to catch up after the set of made-up Pokémon changes.
+function refreshMade() {
+  renderMadeList();
+  renderEvoOptions();
+  renderPicker(queryInput.value);
+}
+
+makeTypeButtonsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-type]");
+  if (!button) return;
+  const type = button.dataset.type;
+  if (makeTypes.includes(type)) makeTypes = makeTypes.filter((t) => t !== type);
+  else if (makeTypes.length >= 2) {
+    setMakeStatus("Two types is the most a Pokémon has — turn one off first.", true);
+    return;
+  } else makeTypes.push(type);
+  setMakeStatus("");
+  renderMakeTypeButtons();
+});
+
+moveTypeButtonsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-type]");
+  if (button) showMoveType(button.dataset.type);
+});
+
+moveSearchEl.addEventListener("input", renderMoveList);
+
+moveListEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-move]");
+  if (button) addRealMove(button.dataset.move);
+});
+
+moveChipsEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-remove-move]");
+  if (!button) return;
+  makeMoves.splice(Number(button.dataset.removeMove), 1);
+  setMoveStatus("");
+  renderMoveChips();
+});
+
+$("addOwnMove").addEventListener("click", addOwnMove);
+
+$("makePictureBtn").addEventListener("click", () => $("makePicture").click());
+$("makePictureClear").addEventListener("click", () => showPicture(""));
+$("makePicture").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  // Clearing it means picking the same file twice in a row still counts.
+  event.target.value = "";
+  if (!file) return;
+  setMakeStatus("Shrinking that picture…");
+  try {
+    showPicture(await shrinkPicture(file));
+    setMakeStatus("");
+  } catch (error) {
+    setMakeStatus(error.message, true);
+  }
+});
+
+madeListEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-edit], button[data-delete], button[data-show]");
+  if (!button) return;
+  if (button.dataset.edit) editMade(button.dataset.edit);
+  else if (button.dataset.delete) deleteMade(button.dataset.delete);
+  else {
+    showTab("dex");
+    queryInput.value = button.dataset.show;
+    updateClearButton();
+    lookup(button.dataset.show);
+  }
+});
+
+$("makeCancel").addEventListener("click", resetMakeForm);
+
+makerForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const name = $("makeName").value.trim();
+  if (!name) { setMakeStatus("Give it a name first.", true); return; }
+
+  const slug = slugify(name);
+  if (!slug) { setMakeStatus("That name needs at least one letter or number in it.", true); return; }
+
+  // A made-up name matching a real one would be unreachable: the list, the
+  // search box and the address bar all work by name, so one would hide the other.
+  if (allPokemon.some((p) => p.name === slug)) {
+    setMakeStatus(`There is already a real Pokémon called ${prettify(slug)} — pick another name.`, true);
+    return;
+  }
+  const clash = madeBySlug(slug);
+  if (clash && clash.id !== editingId) {
+    setMakeStatus(`You have already made one called ${clash.name}.`, true);
+    return;
+  }
+  if (!makeTypes.length) { setMakeStatus("Pick at least one type.", true); return; }
+
+  const existing = editingId ? made.find((e) => e.id === editingId) : null;
+  const entry = {
+    id: existing ? existing.id : newId(),
+    // A dex number is given once and kept, so editing a Pokémon doesn't move it
+    // around the list.
+    dex: existing ? existing.dex : nextDex(),
+    name,
+    slug,
+    category: $("makeCategory").value.trim(),
+    region: $("makeRegion").value,
+    rarity: $("makeRarity").value,
+    types: [...makeTypes],
+    picture: makePicture,
+    moves: makeMoves.map((move) => Object.assign({}, move)),
+    evolvesFrom: evoLink($("evoFromName").value, $("evoFromHow").value),
+    evolvesTo: evoLink($("evoToName").value, $("evoToHow").value),
+    edited: new Date().toISOString(),
+  };
+
+  if (existing) made[made.indexOf(existing)] = entry;
+  else made.push(entry);
+  made.sort((a, b) => a.dex - b.dex);
+
+  if (!saveMade()) return;
+  queueSync();
+  refreshMade();
+  resetMakeForm();
+  setMakeStatus(`Saved ${entry.name}. It is in the list on the first tab.`);
+});
+
+/* ---- Keeping them -------------------------------------------------------- */
+// One file in a private repo, read and written straight from the browser with a
+// fine-grained token. No server involved. Same arrangement as the housework
+// tracker, for the same reason: the records are Sammy's, not the app's, so they
+// don't belong in the repo the app is published from.
+
+const SYNC_DEFAULTS = {
+  owner: "ZeusKodiak",
+  repo: "pokedex-data",
+  branch: "main",
+  path: "pokedex.json",
+  token: "",
+  lastSync: null,
+};
+const SYNC_DEBOUNCE_MS = 4000;
+
+let conf = Object.assign({}, SYNC_DEFAULTS, readJSON(localStorage.getItem(CONF_STORE)) || {});
+let syncing = false;    // a sync is in flight
+let syncAgain = false;  // something changed while it was in flight
+let syncTimer = null;
+let syncState = { state: conf.token ? "idle" : "off", detail: "" };
+
+function saveConf() {
+  try { localStorage.setItem(CONF_STORE, JSON.stringify(conf)); } catch (error) {}
+}
+function connected() { return Boolean(conf.token && conf.owner && conf.repo); }
+
+// btoa only speaks Latin-1, and a name or an effect can hold anything, so the
+// text is turned into bytes first.
+const b64 = {
+  encode(str) {
+    const bytes = new TextEncoder().encode(str);
+    let out = "";
+    for (const byte of bytes) out += String.fromCharCode(byte);
+    return btoa(out);
+  },
+  decode(str) {
+    const bin = atob(str.replace(/\s/g, ""));
+    return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  },
+};
+
+function ghHeaders() {
+  return {
+    "Authorization": "Bearer " + conf.token,
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json",
+  };
+}
+function fileURL() {
+  return `https://api.github.com/repos/${conf.owner}/${conf.repo}/contents/${conf.path}`;
+}
+
+async function ghMessage(res, fallback) {
+  let detail = "";
+  try { detail = (await res.json()).message || ""; } catch (error) {}
+  return `${fallback}${detail ? " — " + detail : ""}`;
+}
+
+const EMPTY_SYNC = { made: [], deleted: [] };
+
+// A missing file is not an error — it's the first ever sync.
+async function readRemote() {
+  const url = `${fileURL()}?ref=${encodeURIComponent(conf.branch)}&t=${Date.now()}`;
+  const res = await fetch(url, { headers: ghHeaders(), cache: "no-store" });
+
+  if (res.status === 404) {
+    // Could be "no file yet" or "no such repo" — worth telling apart, because a
+    // typo in the repo name would otherwise look like an empty history.
+    const repo = await fetch(`https://api.github.com/repos/${conf.owner}/${conf.repo}`,
+                             { headers: ghHeaders() });
+    if (repo.status === 404) {
+      throw new Error(`Can't see ${conf.owner}/${conf.repo} — check the name, and ` +
+                      `that the token is allowed to reach it.`);
+    }
+    if (!repo.ok) throw new Error(await ghMessage(repo, "GitHub said no"));
+    return { data: EMPTY_SYNC, sha: null };
+  }
+  if (res.status === 401) throw new Error("Token rejected — it may have expired.");
+  if (res.status === 403) throw new Error(await ghMessage(res, "Token isn't allowed to read that repo"));
+  if (!res.ok) throw new Error(await ghMessage(res, "Couldn't read from GitHub"));
+
+  const body = await res.json();
+  return { data: readJSON(b64.decode(body.content || "")) || EMPTY_SYNC, sha: body.sha };
+}
+
+// Returns false if the file moved underneath us, so the caller can re-read.
+async function writeRemote(data, sha) {
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const count = data.made.length;
+  const body = {
+    message: `${count} Pokémon (${stamp})`,
+    content: b64.encode(JSON.stringify(data, null, 2) + "\n"),
+    branch: conf.branch,
+  };
+  if (sha) body.sha = sha;
+
+  const res = await fetch(fileURL(), {
+    method: "PUT", headers: ghHeaders(), body: JSON.stringify(body),
+  });
+  if (res.status === 409 || res.status === 422) return false;
+  if (res.status === 401) throw new Error("Token rejected — it may have expired.");
+  if (res.status === 403) throw new Error(await ghMessage(res, "Token can't write to that repo"));
+  if (res.status === 404) {
+    throw new Error(`Can't write to ${conf.owner}/${conf.repo} — the token needs ` +
+                    `Contents: read and write.`);
+  }
+  if (!res.ok) throw new Error(await ghMessage(res, "Couldn't save to GitHub"));
+  return true;
+}
+
+function queueSync() {
+  if (!connected()) return;
+  setSyncStatus("pending");
+  clearTimeout(syncTimer);
+  // Wait for the typing to stop, so a burst of edits is one commit, not six.
+  syncTimer = setTimeout(() => sync(), SYNC_DEBOUNCE_MS);
+}
+
+async function sync() {
+  if (!connected()) return;
+  clearTimeout(syncTimer);
+  if (syncing) { syncAgain = true; return; }
+  syncing = true;
+  setSyncStatus("syncing");
+
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const remote = await readRemote();
+      const merged = mergeMade(madeSnapshot(), remote.data);
+
+      // Take the merged result locally first — if the write then fails, this
+      // device still ends up with anything the other one had added.
+      made = merged.made;
+      madeDeleted = merged.deleted;
+      saveMade();
+      refreshMade();
+
+      const settled = JSON.stringify(mergeMade(remote.data, EMPTY_SYNC));
+      if (settled === JSON.stringify(merged)) break;          // nothing to push
+      if (await writeRemote(merged, remote.sha)) break;       // pushed
+      // Otherwise the other device wrote in the meantime: read again and remerge.
+    }
+    conf.lastSync = new Date().toISOString();
+    saveConf();
+    setSyncStatus("ok");
+  } catch (error) {
+    // A failed fetch with no status at all is almost always no signal.
+    const offline = error instanceof TypeError;
+    setSyncStatus(offline ? "offline" : "error", offline ? "" : error.message);
+    console.warn("Sync failed:", error);
+  } finally {
+    syncing = false;
+    if (syncAgain) { syncAgain = false; queueSync(); }
+  }
+}
+
+function setSyncStatus(state, detail) {
+  syncState = { state, detail: detail || "" };
+  renderSyncStatus();
+}
+
+function ago(iso) {
+  if (!iso) return "";
+  const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function renderSyncStatus() {
+  const last = conf.lastSync ? `Synced ${ago(conf.lastSync)}` : "Not synced yet";
+  $("syncText").textContent = {
+    off: "Kept on this device only",
+    idle: last,
+    pending: "Changes to sync…",
+    syncing: "Syncing…",
+    ok: `Synced ${ago(conf.lastSync)}`,
+    offline: `No connection — will sync later. ${last}`,
+    error: "Sync problem",
+  }[syncState.state] || last;
+
+  $("syncDot").className = "dot " + ({
+    syncing: "busy", pending: "busy", ok: "ok", idle: "ok", error: "bad", offline: "bad",
+  }[syncState.state] || "");
+  $("syncDetail").textContent = syncState.detail;
+  $("syncDetail").hidden = !syncState.detail;
+
+  $("syncWhere").textContent = connected()
+    ? `Your Pokémon sync to ${conf.owner}/${conf.repo}, so another phone or ` +
+      `computer can see them too.`
+    : "Your Pokémon are kept in this browser only. Syncing puts them in a private " +
+      "GitHub repository as well, so another device can see them too.";
+  $("syncNow").hidden = !connected();
+  $("setupBtn").textContent = connected() ? "Change" : "Set up";
+  $("disconnect").hidden = !connected();
+}
+
+$("syncNow").addEventListener("click", () => sync());
+$("setupBtn").addEventListener("click", () => {
+  $("repoInput").value = `${conf.owner}/${conf.repo}`;
+  $("tokenInput").value = conf.token;
+  $("setupForm").hidden = false;
+  $("syncButtons").hidden = true;
+});
+$("cancelConf").addEventListener("click", closeSetup);
+function closeSetup() {
+  $("setupForm").hidden = true;
+  $("syncButtons").hidden = false;
+}
+
+$("setupForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const [owner, repo] = $("repoInput").value.trim()
+    .replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").split("/");
+  if (!owner || !repo) { alert("Give the repository as owner/repo."); return; }
+  const token = $("tokenInput").value.trim();
+  if (!token) { alert("A token is needed to reach a private repository."); return; }
+
+  Object.assign(conf, { owner, repo, token });
+  saveConf();
+  closeSetup();
+  setSyncStatus("syncing");
+  sync();
+});
+
+$("disconnect").addEventListener("click", () => {
+  if (!confirm("Stop syncing and forget the token? The Pokémon already in the " +
+               "repository stay there, and the ones on this device stay too.")) return;
+  Object.assign(conf, { token: "", lastSync: null });
+  saveConf();
+  closeSetup();
+  setSyncStatus("off");
+});
+
 /* ---- Tabs ---------------------------------------------------------------- */
 
 function showTab(name) {
@@ -1330,7 +2573,10 @@ function showTab(name) {
 // until there is something to write, or the first lookup would clear a
 // deep link to a type before it has been read.
 function updateHash() {
-  const target = activeTab === "types" ? matchupType : currentPokemon;
+  // The making tab has nothing to name, so it is its own address.
+  const target = activeTab === "make" ? "make"
+    : activeTab === "types" ? matchupType
+    : currentPokemon;
   if (!target) return;
   lastHash = activeTab === "types" ? `types/${target}` : target;
   if (readHash() !== lastHash) location.hash = lastHash;
@@ -1351,6 +2597,7 @@ window.addEventListener("hashchange", () => {
 });
 
 function routeTo(hash) {
+  if (hash === "make") { showTab("make"); return; }
   const typeLink = hash.match(/^types(?:\/(.+))?$/);
   if (typeLink) {
     if (TYPE_COLOURS[typeLink[1]]) showMatchups(typeLink[1]);
@@ -1464,20 +2711,38 @@ function setStatus(message, isError = false) {
 renderTypeButtons();
 renderMatchupButtons();
 
+// So can everything on the making tab, which needs nothing from the network
+// until a type of move is asked for.
+fillSelects();
+renderMakeTypeButtons();
+renderMoveTypeButtons();
+renderMoveChips();
+renderMadeList();
+renderEvoOptions();
+renderSyncStatus();
+setMoveStatus("Pick a type to see its moves.");
+
 // Allow deep links like index.html#gengar for a Pokémon and index.html#types/fire
 // for a matchup. The Pokémon tab loads either way — it is the one you come back
 // to — with a default so it is never blank.
 const startHash = readHash();
 lastHash = startHash;
 const startsOnTypes = /^types(\/|$)/.test(startHash);
+const startsOnMake = startHash === "make";
 
 // The Pokémon tab loads either way — it is the one you come back to — with a
-// default so it is never blank.
-lookup(startsOnTypes ? "pikachu" : startHash || "pikachu");
+// default so it is never blank. A made-up Pokémon in the link is found without a
+// request, so this covers those too.
+lookup(startsOnTypes || startsOnMake ? "pikachu" : startHash || "pikachu");
 
 // A type named in the link is chosen before the tab opens, so showTab finds one
 // already set. Without one it falls back to the type of the Pokémon above.
-if (startsOnTypes) routeTo(startHash);
+if (startsOnTypes || startsOnMake) routeTo(startHash);
+
+// Pick up anything made on another device, then keep the "synced N minutes ago"
+// line honest while the app is open.
+if (connected()) sync();
+setInterval(renderSyncStatus, 60000);
 
 // The list is a separate request, so let it load alongside the first lookup
 // rather than holding the page up. The box starts empty so the full list shows.
