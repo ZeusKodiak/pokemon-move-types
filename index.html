@@ -707,6 +707,10 @@
                 <input type="number" id="ownMovePP" min="1" max="64" placeholder="15">
               </div>
             </div>
+            <p class="hint">Power goes up to 300, accuracy up to 100, PP up to 64 —
+              about where the strongest real moves sit. Anything higher is brought
+              down to fit. Leave power or accuracy empty for a move that does no
+              damage or never misses.</p>
             <div class="field">
               <label for="ownMoveEffect">What it does</label>
               <input type="text" id="ownMoveEffect" autocomplete="off"
@@ -1785,6 +1789,16 @@ const PICTURE_MAX_PX = 240;
 // The regions the app already knows how to name.
 const MAKE_REGIONS = [...new Set([...Object.values(REGIONS), "Hisui"])];
 
+// What a move's numbers are allowed to be. The boxes carried these all along but
+// nothing applied them: "Add this move" is an ordinary button, so the browser's
+// own checking of min and max never ran and anything typed was taken as given —
+// which is how a move ended up with a power of 1e+22.
+const MOVE_LIMITS = {
+  power: { min: 0, max: 300 },
+  accuracy: { min: 0, max: 100 },
+  pp: { min: 1, max: 64 },
+};
+
 // Records live in this browser and are the working copy: saving is instant and
 // works with no signal. Syncing to GitHub happens afterwards, in the background.
 let made = [];
@@ -1797,10 +1811,41 @@ function readJSON(raw) {
   catch (error) { console.warn("Couldn't read saved Pokémon:", error); return null; }
 }
 
+// Nothing is thrown away: a number out of range is brought to the nearest end of
+// it rather than refused. Blank stays blank, which is what the dash in the table
+// means — a status move has no power, and a move that never misses has no
+// accuracy.
+function clampMove(field, value) {
+  if (value === null || value === undefined || value === "" || Number.isNaN(Number(value))) {
+    return null;
+  }
+  const { min, max } = MOVE_LIMITS[field];
+  return Math.min(max, Math.max(min, Math.round(Number(value))));
+}
+
+function tidyMove(move) {
+  return Object.assign({}, move, {
+    // A status move does no damage whatever its power box said.
+    power: move.damageClass === "status" ? null : clampMove("power", move.power),
+    accuracy: clampMove("accuracy", move.accuracy),
+    pp: clampMove("pp", move.pp) ?? 10,
+  });
+}
+
+// Everywhere records arrive — off the device, off the repo, out of a merge —
+// goes through here, so one already saved with a wild number is brought into
+// range as well rather than only new ones being checked.
+function adoptMade(list, deletedList) {
+  made = (Array.isArray(list) ? list : []).map((entry) =>
+    Object.assign({}, entry, {
+      moves: (entry.moves || []).map(tidyMove),
+    }));
+  madeDeleted = Array.isArray(deletedList) ? deletedList : [];
+}
+
 function loadMade() {
   const data = readJSON(localStorage.getItem(MADE_STORE));
-  made = Array.isArray(data && data.made) ? data.made : [];
-  madeDeleted = Array.isArray(data && data.deleted) ? data.deleted : [];
+  adoptMade(data && data.made, data && data.deleted);
 }
 
 function madeSnapshot() { return { version: 1, made, deleted: madeDeleted }; }
@@ -2175,23 +2220,34 @@ function addOwnMove() {
   }
 
   const damageClass = $("ownMoveClass").value;
-  const number = (id) => ($(id).value === "" ? null : Number($(id).value));
-  makeMoves.push({
+  const typed = {
     name,
     type: $("ownMoveType").value,
-    // A status move does no damage whatever was typed in the power box, which is
-    // what the card's dash in the power column means.
-    power: damageClass === "status" ? null : number("ownMovePower"),
-    accuracy: number("ownMoveAccuracy"),
-    pp: number("ownMovePP") === null ? 10 : number("ownMovePP"),
+    power: $("ownMovePower").value,
+    accuracy: $("ownMoveAccuracy").value,
+    pp: $("ownMovePP").value,
     damageClass,
     effect: $("ownMoveEffect").value.trim(),
-  });
+  };
+  const move = tidyMove(typed);
+  makeMoves.push(move);
+
+  // Say so when a number was brought into range, rather than quietly changing it.
+  const capped = ["power", "accuracy", "pp"].filter(
+    (field) => typed[field] !== "" && Number(typed[field]) !== move[field]
+  );
 
   for (const id of ["ownMoveName", "ownMovePower", "ownMoveAccuracy", "ownMovePP", "ownMoveEffect"]) {
     $(id).value = "";
   }
-  setMoveStatus("");
+  const listed = capped.map((f) => (f === "pp" ? "PP" : f));
+  setMoveStatus(capped.length
+    ? `Added — ${listed.length > 1
+        ? listed.slice(0, -1).join(", ") + " and " + listed.at(-1)
+        : listed[0]} brought into range (${capped
+        .map((f) => `${f === "pp" ? "PP" : f} ${MOVE_LIMITS[f].min}–${MOVE_LIMITS[f].max}`)
+        .join(", ")}).`
+    : "");
   renderMoveChips();
 }
 
@@ -2523,8 +2579,7 @@ async function pullPublic() {
     const res = await fetch(publicURL(), { cache: "no-store" });
     // Nothing saved yet is an ordinary state, not a fault.
     if (res.status === 404) {
-      made = [];
-      madeDeleted = [];
+      adoptMade([], []);
       saveMade();
       refreshMade();
       setSyncStatus("empty");
@@ -2533,8 +2588,7 @@ async function pullPublic() {
     if (!res.ok) throw new Error(`GitHub said no (${res.status}).`);
 
     const data = await res.json();
-    made = Array.isArray(data.made) ? data.made : [];
-    madeDeleted = Array.isArray(data.deleted) ? data.deleted : [];
+    adoptMade(data.made, data.deleted);
     // Kept on the device as well, so they still show with no signal.
     saveMade();
     refreshMade();
@@ -2641,8 +2695,7 @@ async function sync() {
 
       // Take the merged result locally first — if the write then fails, this
       // device still ends up with anything the other one had added.
-      made = merged.made;
-      madeDeleted = merged.deleted;
+      adoptMade(merged.made, merged.deleted);
       saveMade();
       refreshMade();
 
