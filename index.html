@@ -407,9 +407,10 @@
     white-space: nowrap;
   }
 
-  /* In the list, the same idea shrunk to a dot: enough to pick Sammy's own out
-     of a thousand real ones while scrolling, without a word taking up the row. */
-  .picker .made-up { color: var(--accent); margin-right: 0.15rem; }
+  /* The same idea shrunk to a dot, for the places a whole badge won't fit: the
+     list, and a made-up Pokémon sitting in a real one's evolution line. Not
+     scoped to either, so it stays red everywhere it turns up. */
+  .made-up { color: var(--accent); margin-right: 0.15rem; }
 
   .maker-form { display: block; margin: 0; }
   .field { margin-bottom: 1.1rem; }
@@ -422,6 +423,9 @@
     letter-spacing: 0.03em;
   }
   .field .hint { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0 0; }
+  /* Only two things have to be filled in, so those two say so rather than every
+     other field being labelled optional. */
+  .req { color: var(--accent); font-weight: 400; }
   .field input[type="text"], .field input[type="number"], .field select, .field textarea {
     width: 100%;
     font: inherit;
@@ -602,21 +606,23 @@
 <section id="makePanel" role="tabpanel" hidden>
   <p class="tagline">Invent a Pokémon of your own. It gets a card like any other,
     and turns up in the list on the first tab with a red <span class="made-up">●</span>
-    beside it.</p>
+    beside it. Only a name and a type are needed — everything else, the picture
+    included, can be added later by editing it.</p>
 
   <div class="card">
     <form id="makerForm" class="maker-form">
       <div class="field">
-        <label for="makeName">Name</label>
+        <label for="makeName">Name <span class="req">· needed</span></label>
         <input type="text" id="makeName" autocomplete="off" autocapitalize="words"
                spellcheck="false" placeholder="Sparkitty">
       </div>
 
       <div class="field">
         <label for="makeCategory">Category</label>
-        <input type="text" id="makeCategory" autocomplete="off" placeholder="Firefly Pokémon">
-        <p class="hint">The line the games print under the name — Pikachu is the
-          Mouse Pokémon.</p>
+        <input type="text" id="makeCategory" autocomplete="off" placeholder="Firefly">
+        <p class="hint">The line the games print under the name. The word
+          "Pokémon" is added for you, so <strong>Firefly</strong> becomes
+          <strong>Firefly Pokémon</strong> — the way Pikachu is the Mouse Pokémon.</p>
       </div>
 
       <div class="field-row">
@@ -631,8 +637,10 @@
       </div>
 
       <div class="field">
-        <label>Type <span class="hint" style="text-transform:none">— one or two</span></label>
+        <label>Type <span class="req">· needed</span></label>
         <div id="makeTypeButtons" class="filter-buttons"></div>
+        <p class="hint">One or two. Two is the most any Pokémon has, so picking a
+          third drops whichever you chose first.</p>
       </div>
 
       <div class="field">
@@ -713,15 +721,9 @@
         <div class="field">
           <label for="evoFromHow">…by</label>
           <input type="text" id="evoFromHow" autocomplete="off" placeholder="Level 25">
-        </div>
-        <div class="field">
-          <label for="evoToName">Evolves into</label>
-          <input type="text" id="evoToName" list="evoOptions" autocomplete="off"
-                 autocapitalize="off" spellcheck="false" placeholder="Any Pokémon, real or your own">
-        </div>
-        <div class="field">
-          <label for="evoToHow">…by</label>
-          <input type="text" id="evoToHow" autocomplete="off" placeholder="Use Fire Stone">
+          <p class="hint">This end is enough. Anything you make later that evolves
+            <em>from</em> this one will show up after it on its own, so a whole
+            family can be built up one Pokémon at a time.</p>
         </div>
         <datalist id="evoOptions"></datalist>
       </details>
@@ -913,6 +915,11 @@ let typeRequestId = 0;
 // Same idea for Pokémon lookups, which can also overlap. See lookup().
 let lookupId = 0;
 
+// Bumped whenever the set of made-up Pokémon changes, and recorded against the
+// card on screen, so a stale card can be spotted without comparing the two.
+let madeVersion = 0;
+let renderedMade = 0;
+
 // Which tab is showing, and what each one would put in the URL: the last
 // Pokémon looked up, and the type whose matchups are on screen. Both tabs write
 // to the same hash, so only the one being shown gets to set it.
@@ -995,7 +1002,14 @@ clearTypesButton.addEventListener("click", () => {
 
 tabsEl.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-tab]");
-  if (button) showTab(button.dataset.tab);
+  if (!button) return;
+  showTab(button.dataset.tab);
+  // A card drawn before a Pokémon was made up or deleted can be out of date: the
+  // new one may belong in its evolution line. Coming back to that tab is the
+  // moment to notice, and only when something actually changed.
+  if (button.dataset.tab === "dex" && currentPokemon && renderedMade !== madeVersion) {
+    lookup(currentPokemon);
+  }
 });
 
 matchupButtonsEl.addEventListener("click", (event) => {
@@ -1592,16 +1606,52 @@ function render(pokemon, moves, { region, origin, category, rarity, evolution })
       : "<p class='status'>No status moves found for this Pokémon.</p>"}
   `;
   resultEl.appendChild(card);
+  renderedMade = madeVersion;
 }
 
 // `current` is the species name, not the Pokémon name, so alternate forms
 // (deoxys-attack, giratina-origin) still highlight their place in the line.
-function evolutionSection(stages, current) {
+// A real Pokémon's line, with anything of Sammy's that evolves from a member of
+// it grafted on. This is the one place a made-up Pokémon changes a real card, and
+// it has to be: the link is only ever stored on Sammy's side, so without this it
+// would be visible from her Pokémon and invisible from the real one it came from.
+// Nothing else about the real card is touched, and the made-up ones are dotted
+// red here as everywhere else.
+function withMadeDescendants(stages) {
+  const out = stages.map((stage) => stage.slice());
+  // Stage by stage: anything of Sammy's coming from a member of this stage
+  // belongs in the next one, exactly like a real branch. Growing `out` as we go
+  // means a made-up Pokémon evolving from another one is picked up too.
+  for (let i = 0; i < out.length; i++) {
+    const children = [];
+    for (const member of out[i]) {
+      for (const child of made) {
+        if (!child.evolvesFrom || child.evolvesFrom.name !== member.name) continue;
+        // Already somewhere in the line: a loop, or two routes to the same one.
+        if (out.some((stage) => stage.some((m) => m.name === child.slug))) continue;
+        children.push({
+          name: child.slug,
+          display: child.name,
+          img: child.picture,
+          how: child.evolvesFrom.how,
+          made: true,
+        });
+      }
+    }
+    if (!children.length) continue;
+    if (out[i + 1]) out[i + 1].push(...children);
+    else out.push(children);
+  }
+  return out;
+}
+
+function evolutionSection(rawStages, current) {
   const heading = "<h3>Evolution line</h3>";
 
-  if (!stages) {
+  if (!rawStages) {
     return `${heading}<p class="status">Couldn't load the evolution line.</p>`;
   }
+  const stages = withMadeDescendants(rawStages);
   if (stages.length < 2) {
     return `${heading}
       <div class="evo">${evoStage(stages[0], current)}</div>
@@ -1623,7 +1673,7 @@ function evoStage(stage, current) {
         : member.id
           ? `<img src="${SPRITES}/${member.id}.png" alt="" loading="lazy">`
           : ""}
-      <span class="evo-name">${escapeHTML(member.display || prettify(member.name))}</span>
+      <span class="evo-name">${member.made ? '<span class="made-up" aria-label="Made up">●</span> ' : ""}${escapeHTML(member.display || prettify(member.name))}</span>
       ${member.how ? `<span class="evo-how">${escapeHTML(member.how)}</span>` : ""}
     </button>
   `).join("");
@@ -1772,6 +1822,20 @@ function mergeMade(a, b) {
   };
 }
 
+// The card reads "Firefly Pokémon", but typing the "Pokémon" every time is a
+// chore, so the box takes the first part and this adds the rest. Typing it anyway
+// is fine — the suffix is stripped before being put back, so it never doubles up,
+// and the box shows the short form again when the Pokémon is edited.
+const CATEGORY_SUFFIX = /[\s·-]*pok[eé]mon\s*$/i;
+
+function categoryStem(stored) {
+  return String(stored || "").replace(CATEGORY_SUFFIX, "").trim();
+}
+function categoryFull(typed) {
+  const stem = categoryStem(typed);
+  return stem ? `${stem} Pokémon` : "";
+}
+
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
@@ -1834,37 +1898,76 @@ function renderMade(entry) {
       : "<p class='status'>No status moves given to this Pokémon.</p>"}
   `;
   resultEl.appendChild(card);
+  renderedMade = madeVersion;
 }
 
 // Reuses the real evolution line's markup, so a made-up Pokémon sits in a line
 // the same way — and every member of it is still tappable, whether it is one of
 // Sammy's or a real one.
-function madeEvolutionSection(entry) {
-  const heading = "<h3>Evolution line</h3>";
-  // A member's `how` says how you reach *it*, so the one before this Pokémon is
-  // the start of the line and carries nothing — its trigger belongs to this one.
-  const before = evoMember(entry.evolvesFrom, "");
-  const after = evoMember(entry.evolvesTo, entry.evolvesTo ? entry.evolvesTo.how : "");
-
-  // `how` on a member says how you reach that member, so this one carries
-  // whatever turns the Pokémon before it into this.
-  const self = {
-    name: entry.slug,
-    display: entry.name,
-    img: entry.picture,
-    how: before ? entry.evolvesFrom.how : "",
-  };
-
-  if (!before && !after) {
-    return `${heading}
-      <div class="evo">${evoStage([self], entry.slug)}</div>
-      <p class="status">This Pokémon doesn't evolve.</p>`;
+// Only one end of the link is ever set. Saying Sparkitty comes from Charmander
+// is enough for Charmander to appear before it, and for anything made later that
+// comes from Sparkitty to appear after it — so a family is built up one Pokémon
+// at a time and never has to be joined from both ends.
+//
+// The other side of the same link is drawn by withMadeDescendants above, so the
+// real Pokémon this one came from shows it too — the relationship reads the same
+// way round from either card, off the one thing that was typed in.
+function madeChain(entry) {
+  // Back to the earliest made-up ancestor first, guarding against two Pokémon
+  // that each claim to come from the other.
+  const seen = new Set([entry.id]);
+  let root = entry;
+  while (root.evolvesFrom) {
+    const parent = madeBySlug(root.evolvesFrom.name);
+    if (!parent || seen.has(parent.id)) break;
+    seen.add(parent.id);
+    root = parent;
   }
 
   const stages = [];
-  if (before) stages.push([before]);
-  stages.push([self]);
-  if (after) stages.push([after]);
+  // Whatever the root came from is a real Pokémon — a made-up one would have
+  // been walked to above — so it opens the line with no trigger of its own.
+  if (root.evolvesFrom && !madeBySlug(root.evolvesFrom.name)) {
+    stages.push([evoMember(root.evolvesFrom, "")]);
+  }
+
+  // Then forward a stage at a time, so a Pokémon with two made-up descendants
+  // stacks them in one column the way a real branching line does.
+  const visited = new Set([root.id]);
+  let level = [root];
+  while (level.length) {
+    // A member's `how` says how you reach it, which is its own trigger.
+    stages.push(level.map((e) => ({
+      name: e.slug,
+      display: e.name,
+      img: e.picture,
+      how: e.evolvesFrom ? e.evolvesFrom.how : "",
+      made: true,
+    })));
+
+    const next = [];
+    for (const parent of level) {
+      for (const child of made) {
+        if (child.evolvesFrom && child.evolvesFrom.name === parent.slug && !visited.has(child.id)) {
+          visited.add(child.id);
+          next.push(child);
+        }
+      }
+    }
+    level = next;
+  }
+  return stages;
+}
+
+function madeEvolutionSection(entry) {
+  const heading = "<h3>Evolution line</h3>";
+  const stages = madeChain(entry);
+
+  if (stages.length < 2) {
+    return `${heading}
+      <div class="evo">${evoStage(stages[0], entry.slug)}</div>
+      <p class="status">This Pokémon doesn't evolve.</p>`;
+  }
 
   const columns = stages
     .map((stage) => evoStage(stage, entry.slug))
@@ -2112,7 +2215,7 @@ function resetMakeForm() {
   editingId = "";
   makeTypes = [];
   makeMoves = [];
-  for (const id of ["makeName", "makeCategory", "evoFromName", "evoFromHow", "evoToName", "evoToHow"]) {
+  for (const id of ["makeName", "makeCategory", "evoFromName", "evoFromHow"]) {
     $(id).value = "";
   }
   $("makeRegion").value = "";
@@ -2130,7 +2233,8 @@ function editMade(id) {
   if (!entry) return;
   editingId = id;
   $("makeName").value = entry.name;
-  $("makeCategory").value = entry.category || "";
+  // Short form back in the box, since that is what the box asks for.
+  $("makeCategory").value = categoryStem(entry.category);
   $("makeRegion").value = entry.region || "";
   $("makeRarity").value = entry.rarity || "";
   makeTypes = [...entry.types];
@@ -2138,8 +2242,6 @@ function editMade(id) {
   showPicture(entry.picture || "");
   $("evoFromName").value = entry.evolvesFrom ? entry.evolvesFrom.name : "";
   $("evoFromHow").value = entry.evolvesFrom ? entry.evolvesFrom.how : "";
-  $("evoToName").value = entry.evolvesTo ? entry.evolvesTo.name : "";
-  $("evoToHow").value = entry.evolvesTo ? entry.evolvesTo.how : "";
   renderMakeTypeButtons();
   renderMoveChips();
   $("makeSave").textContent = "Save changes";
@@ -2189,6 +2291,7 @@ function renderEvoOptions() {
 
 // Everything that has to catch up after the set of made-up Pokémon changes.
 function refreshMade() {
+  madeVersion++;
   renderMadeList();
   renderEvoOptions();
   renderPicker(queryInput.value);
@@ -2199,10 +2302,10 @@ makeTypeButtonsEl.addEventListener("click", (event) => {
   if (!button) return;
   const type = button.dataset.type;
   if (makeTypes.includes(type)) makeTypes = makeTypes.filter((t) => t !== type);
-  else if (makeTypes.length >= 2) {
-    setMakeStatus("Two types is the most a Pokémon has — turn one off first.", true);
-    return;
-  } else makeTypes.push(type);
+  // Two is the most any Pokémon has. A third tap rolls the oldest one off rather
+  // than refusing: changing your mind about a pair shouldn't need a tap to clear
+  // one first, and the pair on screen is always what gets saved.
+  else makeTypes = [...makeTypes, type].slice(-2);
   setMakeStatus("");
   renderMakeTypeButtons();
 });
@@ -2282,6 +2385,12 @@ makerForm.addEventListener("submit", (event) => {
   }
   if (!makeTypes.length) { setMakeStatus("Pick at least one type.", true); return; }
 
+  const from = evoLink($("evoFromName").value, $("evoFromHow").value);
+  if (from && from.name === slug) {
+    setMakeStatus("A Pokémon can't evolve from itself.", true);
+    return;
+  }
+
   const existing = editingId ? made.find((e) => e.id === editingId) : null;
   const entry = {
     id: existing ? existing.id : newId(),
@@ -2290,14 +2399,13 @@ makerForm.addEventListener("submit", (event) => {
     dex: existing ? existing.dex : nextDex(),
     name,
     slug,
-    category: $("makeCategory").value.trim(),
+    category: categoryFull($("makeCategory").value),
     region: $("makeRegion").value,
     rarity: $("makeRarity").value,
     types: [...makeTypes],
     picture: makePicture,
     moves: makeMoves.map((move) => Object.assign({}, move)),
-    evolvesFrom: evoLink($("evoFromName").value, $("evoFromHow").value),
-    evolvesTo: evoLink($("evoToName").value, $("evoToHow").value),
+    evolvesFrom: from,
     edited: new Date().toISOString(),
   };
 
