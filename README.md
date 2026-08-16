@@ -7,6 +7,7 @@ or Dex number) and it shows
 
 - the region it comes from,
 - its category — the "Mouse Pokémon" line the games print,
+- its G-Max move, if it is one of the Gigantamax forms,
 - whether it is out of the ordinary — legendary, mythical, an Ultra Beast or a
   Paradox Pokémon — which dresses the whole card,
 - the Pokémon's own type(s),
@@ -59,6 +60,38 @@ result in two:
 - **Status moves** — up to ten non-damaging moves, in the order above, since
   they have no power to rank by. Each shows PokéAPI's one-line effect summary,
   because "Swords Dance" on its own tells you nothing.
+
+## Gigantamax forms
+
+Gigantamaxing was the Sword and Shield trick where certain Pokémon grew huge and
+changed shape for a few turns. Thirty-two species could do it, and PokéAPI lists
+each one as its own entry — `charizard-gmax`, `pikachu-gmax` — so they show up in
+the list like any other form.
+
+**Their move tables used to come up empty.** The games keep one list of moves per
+species rather than one per form, so PokéAPI has no moves recorded against
+`charizard-gmax` at all — the app asked, got nothing, and showed nothing. It now
+notices an empty list and falls back to the ordinary form's, which is what the
+games mean: a Gigantamax Charizard knows exactly what a Charizard knows. The card
+says whose list it is showing, so it doesn't look like the form has its own.
+
+**The G-Max move** is the one thing the Gigantamax form really does have that the
+ordinary one doesn't — a signature move replacing every move it knows of that
+type. Gigantamax Charizard's fire moves all become G-Max Wildfire. Each card now
+shows that move, its type, and what it does beyond damage, in a panel of its own
+above the move tables. It isn't in the tables because it can't be taught and has
+no fixed power of its own — it borrows the power of whatever move it replaces.
+
+That table is hard-coded, which nothing else in this app is. It has to be:
+PokéAPI has the eighteen generic Max Moves (Max Flare, Max Geyser) but **no G-Max
+moves at all**, and nothing anywhere linking a Pokémon to its own. Unlike the
+Paradox Pokémon further down, there is no clever way to derive it — the data
+simply isn't there. It needs no upkeep, though: Gigantamaxing was dropped after
+Sword and Shield, so those thirty-four form entries are the whole set, for good.
+
+The table is keyed by form name rather than species because Urshifu's two forms
+take different moves — G-Max One Blow for single strike, G-Max Rapid Flow for
+rapid strike — while Toxtricity's two share one.
 
 ## The evolution line
 

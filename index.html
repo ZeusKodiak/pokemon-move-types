@@ -348,6 +348,24 @@
   .evo-name { text-transform: capitalize; }
   .evo-how { color: var(--muted); font-size: 0.8rem; line-height: 1.3; }
 
+  /* The Gigantamax move is a single move rather than a table of them, so it sits
+     in a small panel: the name and its type pill on one line, what it does under
+     that. */
+  .gmax {
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+  }
+  .gmax-name {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    font-weight: 700;
+  }
+  .gmax-effect { margin: 0.5rem 0 0; }
+  .gmax-note { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
   /* Type matchups: one row per multiplier, label above its pills rather than
      beside them, so a row of six pills doesn't get squeezed on a phone. */
   .matchup-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
@@ -458,6 +476,48 @@ const HISUI_SPECIES = new Set([
   "wyrdeer", "kleavor", "ursaluna", "basculegion", "sneasler", "overqwil", "enamorus",
 ]);
 
+// A Gigantamax Pokémon's signature move. PokéAPI has the eighteen generic Max
+// Moves but no G-Max moves at all, and nothing linking a Pokémon to its own, so
+// this table is the app's. It needs no maintenance: Gigantamaxing was dropped
+// after Sword and Shield, so these thirty-four forms are the whole set, for
+// good. Keyed by form name because Urshifu's two forms have different moves.
+const GMAX_MOVES = {
+  "venusaur-gmax": { move: "G-Max Vine Lash", type: "grass", effect: "Whips the other side for four turns, hurting anything that isn't a grass type." },
+  "charizard-gmax": { move: "G-Max Wildfire", type: "fire", effect: "Sets the other side alight for four turns, hurting anything that isn't a fire type." },
+  "blastoise-gmax": { move: "G-Max Cannonade", type: "water", effect: "Floods the other side for four turns, hurting anything that isn't a water type." },
+  "butterfree-gmax": { move: "G-Max Befuddle", type: "bug", effect: "Poisons, paralyses or puts the other side to sleep." },
+  "pikachu-gmax": { move: "G-Max Volt Crash", type: "electric", effect: "Paralyses everything on the other side." },
+  "meowth-gmax": { move: "G-Max Gold Rush", type: "normal", effect: "Confuses the other side, and scatters coins for extra prize money." },
+  "machamp-gmax": { move: "G-Max Chi Strike", type: "fighting", effect: "Makes your side much likelier to land critical hits." },
+  "gengar-gmax": { move: "G-Max Terror", type: "ghost", effect: "Traps the other side so they can't switch out." },
+  "kingler-gmax": { move: "G-Max Foam Burst", type: "water", effect: "Drops the other side's speed sharply." },
+  "lapras-gmax": { move: "G-Max Resonance", type: "ice", effect: "Puts up Aurora Veil, softening the damage your side takes for five turns." },
+  "eevee-gmax": { move: "G-Max Cuddle", type: "normal", effect: "Makes the other side fall in love, so they often can't bring themselves to attack." },
+  "snorlax-gmax": { move: "G-Max Replenish", type: "normal", effect: "Often brings back berries your side has already eaten." },
+  "garbodor-gmax": { move: "G-Max Malodor", type: "poison", effect: "Poisons everything on the other side." },
+  "melmetal-gmax": { move: "G-Max Meltdown", type: "steel", effect: "Torments the other side, so they can't use the same move twice in a row." },
+  "rillaboom-gmax": { move: "G-Max Drum Solo", type: "grass", effect: "Always hits for 160, and ignores whatever ability the target has." },
+  "cinderace-gmax": { move: "G-Max Fireball", type: "fire", effect: "Always hits for 160, and ignores whatever ability the target has." },
+  "inteleon-gmax": { move: "G-Max Hydrosnipe", type: "water", effect: "Always hits for 160, and ignores whatever ability the target has." },
+  "corviknight-gmax": { move: "G-Max Wind Rage", type: "flying", effect: "Sweeps away the other side's screens and traps, and any terrain in play." },
+  "orbeetle-gmax": { move: "G-Max Gravitas", type: "psychic", effect: "Turns on Gravity, grounding flying Pokémon and making moves more accurate." },
+  "drednaw-gmax": { move: "G-Max Stonesurge", type: "water", effect: "Scatters Stealth Rock on the other side." },
+  "coalossal-gmax": { move: "G-Max Volcalith", type: "rock", effect: "Showers the other side in burning rock for four turns, hurting anything that isn't a rock type." },
+  "flapple-gmax": { move: "G-Max Tartness", type: "grass", effect: "Makes the other side easier to hit." },
+  "appletun-gmax": { move: "G-Max Sweetness", type: "grass", effect: "Cures every status problem on your side." },
+  "sandaconda-gmax": { move: "G-Max Sandblast", type: "ground", effect: "Traps the other side in a sandstorm for four or five turns." },
+  "toxtricity-amped-gmax": { move: "G-Max Stun Shock", type: "electric", effect: "Poisons or paralyses the other side." },
+  "toxtricity-low-key-gmax": { move: "G-Max Stun Shock", type: "electric", effect: "Poisons or paralyses the other side." },
+  "centiskorch-gmax": { move: "G-Max Centiferno", type: "fire", effect: "Traps the other side in flames for four or five turns." },
+  "hatterene-gmax": { move: "G-Max Smite", type: "fairy", effect: "Confuses the other side." },
+  "grimmsnarl-gmax": { move: "G-Max Snooze", type: "dark", effect: "Often makes the target yawn, sending it to sleep a turn later." },
+  "alcremie-gmax": { move: "G-Max Finale", type: "fairy", effect: "Heals your side by about a sixth of their health." },
+  "copperajah-gmax": { move: "G-Max Steelsurge", type: "steel", effect: "Scatters sharp steel on the other side." },
+  "duraludon-gmax": { move: "G-Max Depletion", type: "dragon", effect: "Takes two PP off whichever move the target used last." },
+  "urshifu-single-strike-gmax": { move: "G-Max One Blow", type: "dark", effect: "Goes straight through Max Guard." },
+  "urshifu-rapid-strike-gmax": { move: "G-Max Rapid Flow", type: "water", effect: "Goes straight through Max Guard." },
+};
+
 // Long lists are slow to render on a phone, so cap what is shown at once.
 const MAX_LISTED = 200;
 
@@ -482,6 +542,11 @@ const matchupEl = document.getElementById("matchup");
 
 // Move details are fetched one request per move, so cache them across lookups.
 const moveCache = new Map();
+
+// Two things want the species record at the same moment — the region and
+// evolution panel, and the ordinary form that a form with no moves borrows them
+// from — so cache it and let them share the one request.
+const speciesCache = new Map();
 
 // Every Pokémon name, fetched once so filtering happens locally with no lag.
 let allPokemon = [];
@@ -827,7 +892,7 @@ async function loadSpeciesExtras(pokemon) {
 
   let species;
   try {
-    species = await fetchJSON(pokemon.species.url);
+    species = await loadSpecies(pokemon.species.url);
   } catch {
     return { region: variant, origin: "", category: "", rarity: byAbility, evolution: null };
   }
@@ -1003,10 +1068,47 @@ async function fetchJSON(url) {
 // notion of a signature or competitive moveset. Level-up moves first, because a
 // species' level-up list is the closest thing to a characteristic moveset;
 // TM/tutor/egg moves fill the rest of the table.
+function loadSpecies(url) {
+  if (!speciesCache.has(url)) {
+    speciesCache.set(
+      url,
+      fetchJSON(url)
+        // Don't cache a failure, or a blip would wedge that species until reload.
+        .catch((error) => {
+          speciesCache.delete(url);
+          throw error;
+        })
+    );
+  }
+  return speciesCache.get(url);
+}
+
+// A battle-only form has no learnset of its own. The Gigantamax ones are the
+// clearest case: the games keep one list of moves per species rather than one
+// per form, so PokéAPI has no moves at all against charizard-gmax and the tables
+// came out empty. Borrowing the ordinary form's list is what the games mean —
+// a Gigantamax Charizard knows exactly what a Charizard knows.
+async function baseForm(pokemon) {
+  const species = await loadSpecies(pokemon.species.url);
+  const base = (species.varieties || []).find((variety) => variety.is_default);
+  return base ? fetchJSON(base.pokemon.url) : pokemon;
+}
+
 async function loadMainMoves(pokemon) {
+  let source = pokemon;
+  if (!pokemon.moves.length) {
+    // Failing to find the ordinary form should leave the card short of its move
+    // tables, not lose the whole Pokémon.
+    try {
+      source = await baseForm(pokemon);
+    } catch {
+      source = pokemon;
+    }
+  }
+
   const levelUp = [];
   const other = [];
-  for (const entry of pokemon.moves) {
+  for (const entry of source.moves) {
     const learnedByLevel = entry.version_group_details.some(
       (detail) => detail.move_learn_method.name === "level-up"
     );
@@ -1027,6 +1129,8 @@ async function loadMainMoves(pokemon) {
     status: details
       .filter((move) => move.damageClass === "status")
       .slice(0, 10),
+    // Who the list actually belongs to, so the card can say when it is borrowed.
+    from: source === pokemon ? "" : source.name,
   };
 }
 
@@ -1081,6 +1185,14 @@ function render(pokemon, moves, { region, origin, category, rarity, evolution })
 
     ${evolutionSection(evolution, pokemon.species.name)}
 
+    ${gmaxSection(pokemon)}
+
+    ${moves.from
+      ? `<p class="status borrowed">The moves below are ordinary
+         ${escapeHTML(titleCase(moves.from))}'s. This form is a battle form, so the games
+         give it no list of its own.</p>`
+      : ""}
+
     <h3>Attacking moves <span class="note">— highest-power moves it can learn</span></h3>
     ${moves.damaging.length
       ? moveTable(moves.damaging)
@@ -1124,6 +1236,21 @@ function evoStage(stage, current) {
     </button>
   `).join("");
   return `<div class="evo-stage">${members}</div>`;
+}
+
+// One move rather than a list of them, and not a move it can be taught, so it
+// gets a small panel of its own instead of a one-row table.
+function gmaxSection(pokemon) {
+  const gmax = GMAX_MOVES[pokemon.name];
+  if (!gmax) return "";
+  return `
+    <h3>Gigantamax move</h3>
+    <div class="gmax">
+      <div class="gmax-name">${escapeHTML(gmax.move)} ${typePill(gmax.type)}</div>
+      <p class="gmax-effect">${escapeHTML(gmax.effect)}</p>
+      <p class="gmax-note">While it is Gigantamaxed, every ${escapeHTML(gmax.type)} move it
+        knows turns into this one.</p>
+    </div>`;
 }
 
 function moveTable(moves) {
