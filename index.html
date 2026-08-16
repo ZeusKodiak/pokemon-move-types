@@ -63,6 +63,10 @@
     }
   }
   * { box-sizing: border-box; }
+  /* Switching something off has to beat the display rules further down, or a
+     panel marked hidden goes on showing — a `display` in a class always wins
+     over the browser's own rule for the hidden attribute. */
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     padding: 1.5rem 1rem 4rem;
@@ -604,12 +608,16 @@
 </section>
 
 <section id="makePanel" role="tabpanel" hidden>
-  <p class="tagline">Invent a Pokémon of your own. It gets a card like any other,
-    and turns up in the list on the first tab with a red <span class="made-up">●</span>
-    beside it. Only a name and a type are needed — everything else, the picture
-    included, can be added later by editing it.</p>
+  <p class="tagline" id="makerIntro" hidden>Invent a Pokémon of your own. It gets a
+    card like any other, and turns up in the list on the first tab with a red
+    <span class="made-up">●</span> beside it. Only a name and a type are needed —
+    everything else, the picture included, can be added later by editing it.</p>
 
-  <div class="card">
+  <p class="tagline" id="viewerNote" hidden>Sammy's own Pokémon. They turn up in the
+    list on the first tab too, with a red <span class="made-up">●</span> beside them.
+    They are made and changed on one device — this one just shows them.</p>
+
+  <div class="card" id="makerCard" hidden>
     <form id="makerForm" class="maker-form">
       <div class="field">
         <label for="makeName">Name <span class="req">· needed</span></label>
@@ -1185,7 +1193,14 @@ function filterPokemon(rawQuery) {
 }
 
 function renderPicker(rawQuery) {
-  if (!allPokemon.length) {
+  // Sammy's own are here whether or not PokéAPI's list has arrived — they come
+  // off the device, not the network. So "still loading" is only the right thing
+  // to say when there is nothing at all to show yet; with her Pokémon in hand,
+  // the list is useful straight away and stays useful with no signal.
+  if (!pokemonPool().length) {
+    // Nothing to show means show nothing: leaving the previous rows up would
+    // offer Pokémon that have just been deleted.
+    pickerEl.innerHTML = "";
     pickerCountEl.textContent = "Loading the Pokémon list…";
     return;
   }
@@ -2280,6 +2295,9 @@ function deleteMade(id) {
 }
 
 function renderMadeList() {
+  // Changing them is only offered on the device that can actually save the
+  // change; everywhere else the buttons would fail, so they aren't shown.
+  const editor = connected();
   madeListEl.innerHTML = made.map((entry) => `<li>
     ${entry.picture
       ? `<img src="${escapeHTML(entry.picture)}" alt="">`
@@ -2290,9 +2308,15 @@ function renderMadeList() {
         entry.types.length ? " · " + escapeHTML(entry.types.join(" / ")) : ""}</span>
     </span>
     <button type="button" class="ghost" data-show="${escapeHTML(entry.slug)}">View</button>
-    <button type="button" class="ghost" data-edit="${escapeHTML(entry.id)}">Edit</button>
-    <button type="button" class="ghost" data-delete="${escapeHTML(entry.id)}">Delete</button>
+    ${editor ? `
+      <button type="button" class="ghost" data-edit="${escapeHTML(entry.id)}">Edit</button>
+      <button type="button" class="ghost" data-delete="${escapeHTML(entry.id)}">Delete</button>`
+    : ""}
   </li>`).join("");
+
+  $("madeEmpty").textContent = editor
+    ? "None yet — the first one you save shows up here."
+    : "None saved yet. They are made on the device set up for it.";
   $("madeEmpty").hidden = made.length > 0;
 }
 
@@ -2455,7 +2479,9 @@ let conf = Object.assign({}, SYNC_DEFAULTS, readJSON(localStorage.getItem(CONF_S
 let syncing = false;    // a sync is in flight
 let syncAgain = false;  // something changed while it was in flight
 let syncTimer = null;
-let syncState = { state: conf.token ? "idle" : "off", detail: "" };
+// Both kinds of device start out idle; the status line words it differently
+// depending on whether this one can save changes or only show them.
+let syncState = { state: "idle", detail: "" };
 
 function saveConf() {
   try { localStorage.setItem(CONF_STORE, JSON.stringify(conf)); } catch (error) {}
@@ -2476,6 +2502,52 @@ const b64 = {
     return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
   },
 };
+
+// Where the file can be read from without a token at all, now that the repo is
+// public. GitHub serves it with `access-control-allow-origin: *`, so the app can
+// fetch it from anywhere, and the timestamp gets past the five-minute cache in
+// front of it so a Pokémon saved a moment ago shows up rather than the last copy.
+function publicURL() {
+  return `https://raw.githubusercontent.com/${conf.owner}/${conf.repo}/` +
+         `${conf.branch}/${conf.path}?t=${Date.now()}`;
+}
+
+// A device with no token just reads. Nothing to paste, nothing to set up: open
+// the app anywhere and Sammy's Pokémon are there. It never writes back, which is
+// what keeps adding and changing to the one device that has a token — two
+// devices editing the same records without one being in charge is where the
+// confusing cases come from.
+async function pullPublic() {
+  setSyncStatus("syncing");
+  try {
+    const res = await fetch(publicURL(), { cache: "no-store" });
+    // Nothing saved yet is an ordinary state, not a fault.
+    if (res.status === 404) {
+      made = [];
+      madeDeleted = [];
+      saveMade();
+      refreshMade();
+      setSyncStatus("empty");
+      return;
+    }
+    if (!res.ok) throw new Error(`GitHub said no (${res.status}).`);
+
+    const data = await res.json();
+    made = Array.isArray(data.made) ? data.made : [];
+    madeDeleted = Array.isArray(data.deleted) ? data.deleted : [];
+    // Kept on the device as well, so they still show with no signal.
+    saveMade();
+    refreshMade();
+    conf.lastSync = new Date().toISOString();
+    saveConf();
+    setSyncStatus("ok");
+  } catch (error) {
+    // Whatever went wrong, the copy already on the device stays on screen.
+    const offline = error instanceof TypeError;
+    setSyncStatus(offline ? "offline" : "error", offline ? "" : error.message);
+    console.warn("Couldn't read the saved Pokémon:", error);
+  }
+}
 
 function ghHeaders() {
   return {
@@ -2608,35 +2680,54 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+// Two kinds of device. The one holding a token is where Pokémon are made and
+// changed; every other one shows them and nothing more. Which one this is decides
+// what the tab offers, so it is worked out in one place.
+function applyRole() {
+  const editor = connected();
+  $("makerCard").hidden = !editor;
+  $("makerIntro").hidden = !editor;
+  $("viewerNote").hidden = editor;
+  renderMadeList();
+}
+
 function renderSyncStatus() {
-  const last = conf.lastSync ? `Synced ${ago(conf.lastSync)}` : "Not synced yet";
+  const editor = connected();
+  const when = ago(conf.lastSync);
+  const last = conf.lastSync
+    ? (editor ? `Synced ${when}` : `Checked ${when}`)
+    : (editor ? "Not synced yet" : "Not loaded yet");
+
   $("syncText").textContent = {
-    off: "Kept on this device only",
+    empty: "Nothing saved yet",
     idle: last,
     pending: "Changes to sync…",
-    syncing: "Syncing…",
-    ok: `Synced ${ago(conf.lastSync)}`,
-    offline: `No connection — will sync later. ${last}`,
-    error: "Sync problem",
+    syncing: editor ? "Syncing…" : "Loading…",
+    ok: last,
+    offline: `No connection — showing the copy on this device. ${last}`,
+    error: editor ? "Sync problem" : "Couldn't load the latest",
   }[syncState.state] || last;
 
   $("syncDot").className = "dot " + ({
-    syncing: "busy", pending: "busy", ok: "ok", idle: "ok", error: "bad", offline: "bad",
+    syncing: "busy", pending: "busy", ok: "ok", idle: "ok", empty: "ok",
+    error: "bad", offline: "bad",
   }[syncState.state] || "");
   $("syncDetail").textContent = syncState.detail;
   $("syncDetail").hidden = !syncState.detail;
 
-  $("syncWhere").textContent = connected()
-    ? `Your Pokémon sync to ${conf.owner}/${conf.repo}, so another phone or ` +
-      `computer can see them too.`
-    : "Your Pokémon are kept in this browser only. Syncing puts them in a private " +
-      "GitHub repository as well, so another device can see them too.";
-  $("syncNow").hidden = !connected();
-  $("setupBtn").textContent = connected() ? "Change" : "Set up";
-  $("disconnect").hidden = !connected();
+  $("syncWhere").textContent = editor
+    ? `This is the device Pokémon are made on. They are saved to ` +
+      `${conf.owner}/${conf.repo}, where every other device reads them from.`
+    : `Sammy's Pokémon are read from ${conf.owner}/${conf.repo}, which needs no ` +
+      `setting up on this device. Adding a token here would make this a device ` +
+      `that can add and change them too.`;
+  $("syncNow").textContent = editor ? "Sync now" : "Check for new ones";
+  $("syncNow").hidden = false;
+  $("setupBtn").textContent = editor ? "Change" : "Set up editing";
+  $("disconnect").hidden = !editor;
 }
 
-$("syncNow").addEventListener("click", () => sync());
+$("syncNow").addEventListener("click", () => (connected() ? sync() : pullPublic()));
 $("setupBtn").addEventListener("click", () => {
   $("repoInput").value = `${conf.owner}/${conf.repo}`;
   $("tokenInput").value = conf.token;
@@ -2660,6 +2751,7 @@ $("setupForm").addEventListener("submit", (event) => {
   Object.assign(conf, { owner, repo, token });
   saveConf();
   closeSetup();
+  applyRole();
   setSyncStatus("syncing");
   sync();
 });
@@ -2670,7 +2762,9 @@ $("disconnect").addEventListener("click", () => {
   Object.assign(conf, { token: "", lastSync: null });
   saveConf();
   closeSetup();
-  setSyncStatus("off");
+  applyRole();
+  // Back to being a device that only shows them.
+  pullPublic();
 });
 
 /* ---- Tabs ---------------------------------------------------------------- */
@@ -2843,6 +2937,7 @@ renderMoveChips();
 renderMadeList();
 renderEvoOptions();
 renderSyncStatus();
+applyRole();
 setMoveStatus("Pick a type to see its moves.");
 
 // Allow deep links like index.html#gengar for a Pokémon and index.html#types/fire
@@ -2862,15 +2957,18 @@ lookup(startsOnTypes || startsOnMake ? "pikachu" : startHash || "pikachu");
 // already set. Without one it falls back to the type of the Pokémon above.
 if (startsOnTypes || startsOnMake) routeTo(startHash);
 
-// Pick up anything made on another device, then keep the "synced N minutes ago"
-// line honest while the app is open.
-if (connected()) sync();
+// The device with a token syncs both ways; every other one just reads what has
+// been saved. Then keep the "checked N minutes ago" line honest while it is open.
+if (connected()) sync(); else pullPublic();
 setInterval(renderSyncStatus, 60000);
 
 // The list is a separate request, so let it load alongside the first lookup
 // rather than holding the page up. The box starts empty so the full list shows.
 loadPokemonList().catch(() => {
-  pickerCountEl.textContent = "Couldn't load the Pokémon list — typing a name still works.";
+  pickerCountEl.textContent = made.length
+    ? "Couldn't load the list of real Pokémon — Sammy's own are still here, and " +
+      "typing a name still works."
+    : "Couldn't load the Pokémon list — typing a name still works.";
 });
 </script>
 </body>
