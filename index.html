@@ -1815,11 +1815,26 @@ function mergeMade(a, b) {
       byId.set(entry.id, entry);
     }
   }
-  return {
-    version: 1,
-    made: [...byId.values()].sort((x, y) => x.dex - y.dex),
-    deleted: [...gone],
-  };
+  // Two devices each making one before they next meet will both hand out the
+  // same number, because each only counts what it can see. Settle it here rather
+  // than at the moment of saving: the one made first keeps the number it was
+  // given, and the other moves up to the next free one. Copies are renumbered so
+  // nothing passed in is altered, and the same input always gives the same
+  // answer — which is what lets both devices land on it independently.
+  const merged = [...byId.values()]
+    .sort((x, y) =>
+      x.dex - y.dex ||
+      String(x.edited || "").localeCompare(String(y.edited || "")) ||
+      String(x.id).localeCompare(String(y.id)))
+    .map((entry) => Object.assign({}, entry));
+
+  const taken = new Set();
+  for (const entry of merged) {
+    while (taken.has(entry.dex)) entry.dex++;
+    taken.add(entry.dex);
+  }
+
+  return { version: 1, made: merged, deleted: [...gone] };
 }
 
 // The card reads "Firefly Pokémon", but typing the "Pokémon" every time is a
